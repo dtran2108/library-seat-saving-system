@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+    <main class="container max-w-lg mx-auto mt-16">
+        <h1 class="text-5xl font-bold mb-4">Welcome back</h1>
+        <p class="text-gray-500">Sign in to your account below</p>
+        {% if message %}
+            <p class="pt-5 text-red-500"><strong>{{ message }}</strong></p>
+        {% endif %}
+        <form method="POST" action="" class="mt-8 space-y-6">
+            {{ form.hidden_tag() }}
+
+            <div>
+                {{ form.username.label(class="block text-sm text-gray-700") }}
+                <div class="mt-1">
+                    {{ form.username() }} 
+                </div>
+                {% for error in form.username.errors %}
+                    <span class="text-sm text-red-500">[{{ error }}]</span>
+                {% endfor %}
+            </div>
+
+            <div>
+                {{ form.password.label(class="block text-sm font-medium text-gray-700") }}
+                <div class="mt-1">
+                    {{ form.password() }}
+                </div>
+                {% for error in form.password.errors %}
+                    <span class="text-sm text-red-500">[{{ error }}]</span>
+                {% endfor %}
+            </div>
+
+            <div>
+                {{ form.submit() }}
+            </div>
+        </form>
+        <p class="mt-4">Don't have an account? Register</p>
+    </main>
+{% endblock %}

@@ -1,0 +1,26 @@
+{
+  "name": "term-project",
+  "version": "1.0.0",
+  "description": "NSYSU MIS205 Group project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dtran2108/library-seat-saving-system.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/dtran2108/library-seat-saving-system/issues"
+  },
+  "homepage": "https://github.com/dtran2108/library-seat-saving-system#readme",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.2.4",
+    "@tailwindcss/forms": "^0.5.11",
+    "tailwindcss": "^4.2.4"
+  }
+}
