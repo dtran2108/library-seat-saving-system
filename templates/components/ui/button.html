@@ -1,0 +1,36 @@
+{% macro Button(text="", variant="default", size="default", class="", type="button") %}
+{# 1. The Base Classes #}
+{% set base = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0" %}
+
+{# 2. The Variants #}
+{% set variants = {
+    'default': 'bg-primary text-primary-foreground shadow hover:bg-primary/90',
+    'destructive': 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
+    'outline': 'border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground',
+    'secondary': 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
+    'ghost': 'hover:bg-accent hover:text-accent-foreground',
+    'link': 'text-primary underline-offset-4 hover:underline'
+} %}
+
+{# 3. The Sizes #}
+{% set sizes = {
+    'default': 'h-9 px-4 py-2',
+    'sm': 'h-8 rounded-md px-3 text-xs',
+    'lg': 'h-10 rounded-md px-8',
+    'icon': 'h-9 w-9'
+} %}
+
+{# 4. Safe Fallbacks (In case an invalid string is passed) #}
+{% set current_variant = variants.get(variant, variants['default']) %}
+{% set current_size = sizes.get(size, sizes['default']) %}
+
+{# 5. The Rendered Component #}
+<button type="{{ type }}" class="{{ base }} {{ current_variant }} {{ current_size }} {{ class }}">
+    {# If the user wraps the macro in a block, render the children. Otherwise, render the text prop #}
+    {% if caller %}
+        {{ caller() }}
+    {% else %}
+        {{ text }}
+    {% endif %}
+</button>
+{% endmacro %}

@@ -1,14 +1,81 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="../static/css/output.css" rel="stylesheet">
-    <title>Document</title>
-</head>
-<body>
-    <div class="bg-blue-600">
-        background is red
+{% extends "layout.html" %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/icon.html" import Icon %}
+{% block title %}Home{%endblock %}
+{% block content%}
+<div class="min-h-screen bg-background">
+  <!-- Nav -->
+  <nav
+    class="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50"
+  >
+    <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+      <span class="font-playfair text-xl font-bold text-primary"
+        >Group 6 | MIS205</span
+      >
+      <div class="flex gap-2">
+        <a href="{{ url_for('login') }}">
+          {{ Button("Login", variant="ghost") }}
+        </a>
+        <a href="{{ url_for('sign_up') }}">
+          {{ Button("Sign up", variant="primary") }}
+        </a>
+      </div>
     </div>
-</body>
-</html>
+  </nav>
+
+  <!-- Hero -->
+  <section class="max-w-5xl mx-auto px-4 pt-20 pb-16 text-center">
+    <div
+      class="inline-flex items-center gap-2 bg-accent text-accent-foreground px-3 py-1 rounded-full text-sm font-medium mb-6"
+    >
+      <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+      Live seat availability
+    </div>
+    <h1
+      class="font-playfair text-4xl md:text-6xl font-bold text-foreground leading-tight mb-4"
+    >
+      Reserve your seat,<br />
+      <span class="text-primary">study with peace.</span>
+    </h1>
+    <p class="text-muted-foreground text-lg max-w-xl mx-auto mb-8">
+      Stop wasting time looking for a seat. <br />Book your spot in the library
+      study room in seconds.
+    </p>
+    <div class="flex gap-3 justify-center flex-wrap">
+      <a href="{{ url_for('login') }}">
+        {{ Button("Book a Seat", variant="primary", size="lg") }}
+      </a>
+      <a href="{{ url_for('login') }}">
+        {{ Button("View Seat Map", variant="outline", size="lg") }}
+      </a>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="max-w-5xl mx-auto px-4 py-12">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {% for feature in features %}
+      <div
+        class="bg-card border border-border rounded-2xl p-5 hover:shadow-md transition-shadow"
+      >
+        <div
+          class="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center mb-3"
+        >
+          {{ Icon(feature.icon, class="w-5 h-5 text-primary") }}
+        </div>
+
+        <h3 class="font-semibold text-foreground mb-1">{{ feature.title }}</h3>
+        <p class="text-sm text-muted-foreground">{{ feature.desc }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer
+    class="border-t border-border mt-12 py-6 text-center text-sm text-muted-foreground"
+  >
+    © 2026 Group 6 - MIS205
+  </footer>
+</div>
+{% endblock %}

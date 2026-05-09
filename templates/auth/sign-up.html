@@ -1,41 +1,50 @@
-{% extends "layout.html" %}
-{% block title %}Sign up{% endblock %}
-{% block content %}
-    <main class="container max-w-lg mx-auto mt-16">
-        <h1 class="text-5xl font-bold mb-4">Register new account</h1>
-        <p class="text-gray-500">Enter your information below</p>
-        {% if message %}
-            <p class="pt-5 text-red-500"><strong>{{ message }}</strong></p>
-        {% endif %}
-        <form method="POST" action="" class="mt-8 space-y-6">
-            {{ form.hidden_tag() }}
+{% extends "layout.html" %} {# Import your UI macros #} {% from
+"components/ui/button.html" import Button %} {% from "components/ui/icon.html"
+import Icon %} {% block title %}Create Account{% endblock %} {% block content %}
+<div class="min-h-screen bg-background flex items-center justify-center px-4">
+  <div class="w-full max-w-sm">
+    <!-- Header Section -->
+    <div class="text-center mb-8">
+      <div
+        class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-3"
+      >
+        {{ Icon('book-open', class="w-6 h-6 text-primary") }}
+      </div>
+      <h1 class="font-playfair text-2xl font-bold text-foreground">
+        Create your account
+      </h1>
+      <p class="text-muted-foreground text-sm mt-1">
+        Join LibraSeat with your student email
+      </p>
+    </div>
 
-            <div>
-                {{ form.username.label(class="block text-sm text-gray-700") }}
-                <div class="mt-1">
-                    {{ form.username() }} 
-                </div>
-                {% for error in form.username.errors %}
-                    <span class="text-sm text-red-500">[{{ error }}]</span>
-                {% endfor %}
-            </div>
+    <!-- Card Section -->
+    <div class="bg-card border border-border rounded-2xl p-6 shadow-sm">
+      <p class="text-sm text-muted-foreground mb-4 text-center">
+        Use your student email address to register. Once signed in, you can add
+        your Student ID from your profile.
+      </p>
 
-            <div>
-                {{ form.password.label(class="block text-sm font-medium text-gray-700") }}
-                <div class="mt-1">
-                    {{ form.password() }}
-                </div>
-                {% for error in form.password.errors %}
-                    <span class="text-sm text-red-500">[{{ error }}]</span>
-                {% endfor %}
-            </div>
+      <form action="{{ url_for('login') }}" method="POST">
+        {{ Button("Sign Up / Sign In", class="w-full", type="submit") }}
+      </form>
+    </div>
 
-            <div>
-                {{ form.submit() }}
-            </div>
-        </form>
-        <p class="mt-4">Already have an account? 
-            <a class="text-indigo-500" href="{{ url_for('login') }}">Login</a>
-        </p>
-    </main>
+    <!-- Footer Links -->
+    <p class="text-center text-sm text-muted-foreground mt-4">
+      Already have an account?
+      <a
+        href="{{ url_for('login') }}"
+        class="text-primary font-medium hover:underline"
+      >
+        Log in
+      </a>
+    </p>
+    <p class="text-center text-sm text-muted-foreground mt-2">
+      <a href="{{ url_for('index') }}" class="hover:underline"
+        >← Back to home</a
+      >
+    </p>
+  </div>
+</div>
 {% endblock %}

@@ -12,6 +12,16 @@ app.secret_key = secret
 
 # forms in Flask
 csrf = CSRFProtect(app)
+
+@app.route("/")
+def index():
+    features = [
+        {"icon": "map-pin", "title": "Interactive Seat Map", "desc": "See the full floor plan with real-time availability at a glance."},
+        {"icon": "clock", "title": "Easy Booking", "desc": "Reserve a seat for up to 4 hours. No more saving with bags!"},
+        {"icon": "shield-check", "title": "Fair for Everyone", "desc": "Confirmed reservations only — no phantom placeholders."},
+        {"icon": "book-open", "title": "Manage Your Sessions", "desc": "View, modify or cancel your upcoming bookings anytime."}
+    ]
+    return render_template("index.html", features=features)
  
 @app.route("/login", methods=['GET', 'POST'])
 def login():
