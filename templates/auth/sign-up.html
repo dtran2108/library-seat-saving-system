@@ -1,6 +1,7 @@
-{% extends "layout.html" %} {# Import your UI macros #} {% from
-"components/ui/button.html" import Button %} {% from "components/ui/icon.html"
-import Icon %} {% block title %}Create Account{% endblock %} {% block content %}
+{% extends "layout.html" %} {% from "components/ui/button.html" import Button %}
+{% from "components/ui/icon.html" import Icon %} {% from
+"components/ui/input.html" import Input %} {% block title %}Login{% endblock %}
+{% block content %}
 <div class="min-h-screen bg-background flex items-center justify-center px-4">
   <div class="w-full max-w-sm">
     <!-- Header Section -->
@@ -14,19 +15,42 @@ import Icon %} {% block title %}Create Account{% endblock %} {% block content %}
         Create your account
       </h1>
       <p class="text-muted-foreground text-sm mt-1">
-        Join LibraSeat with your student email
+        Join our booking system with your student ID
       </p>
     </div>
 
     <!-- Card Section -->
     <div class="bg-card border border-border rounded-2xl p-6 shadow-sm">
-      <p class="text-sm text-muted-foreground mb-4 text-center">
-        Use your student email address to register. Once signed in, you can add
-        your Student ID from your profile.
-      </p>
+      <form method="POST" action="" class="space-y-6">
+        {{ form.hidden_tag() }}
 
-      <form action="{{ url_for('login') }}" method="POST">
-        {{ Button("Sign Up / Sign In", class="w-full", type="submit") }}
+        <div class="space-y-1">
+          {{ form.username.label(class="text-sm font-medium leading-none
+          text-foreground") }} {{ Input(form.username) }} {% for error in
+          form.username.errors %}
+          <span class="text-sm text-destructive">[{{ error }}]</span>
+          {% endfor %}
+        </div>
+
+        <div class="space-y-1">
+          {{ form.password.label(class="text-sm font-medium leading-none
+          text-foreground") }} {{ Input(form.password) }} {% for error in
+          form.password.errors %}
+          <span class="text-sm text-destructive">[{{ error }}]</span>
+          {% endfor %}
+        </div>
+
+        <div class="space-y-1">
+          {{ form.confirm_password.label(class="text-sm font-medium leading-none
+          text-foreground") }} {{ Input(form.confirm_password) }} {% for error in
+          form.confirm_password.errors %}
+          <span class="text-sm text-destructive">[{{ error }}]</span>
+          {% endfor %}
+        </div>
+
+        <div>
+          {{ Button(form.submit.label.text, class="w-full", type="submit") }}
+        </div>
       </form>
     </div>
 
@@ -37,7 +61,7 @@ import Icon %} {% block title %}Create Account{% endblock %} {% block content %}
         href="{{ url_for('login') }}"
         class="text-primary font-medium hover:underline"
       >
-        Log in
+        Login
       </a>
     </p>
     <p class="text-center text-sm text-muted-foreground mt-2">

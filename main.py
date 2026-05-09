@@ -1,7 +1,7 @@
 from flask import Flask, render_template
 import secrets
 
-from forms import LoginForm
+from forms import LoginForm, SignUpForm
 from flask_wtf import CSRFProtect
 
 app = Flask(__name__)
@@ -25,19 +25,19 @@ def index():
  
 @app.route("/login", methods=['GET', 'POST'])
 def login():
-    form = LoginForm()
+    login_form = LoginForm()
     message = ""
-    if form.validate_on_submit():
+    if login_form.validate_on_submit():
         message = "Invalid login credentials!"
-    return render_template("auth/login.html", form=form, message=message)
+    return render_template("auth/login.html", form=login_form, message=message)
 
 @app.route("/sign-up", methods=['GET', 'POST'])
 def sign_up():
-    form = LoginForm()
+    sign_up_form = SignUpForm()
     message = ""
-    if form.validate_on_submit():
+    if sign_up_form.validate_on_submit():
         message = "Invalid login credentials!"
-    return render_template("auth/sign-up.html", form=form, message=message)
+    return render_template("auth/sign-up.html", form=sign_up_form, message=message)
 
  
 if __name__ == "__main__":
