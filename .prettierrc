@@ -1,27 +1,24 @@
 {
-  "printWidth": 100,
-  "tabWidth": 4,
-  "useTabs": false,
-  "semi": true,
-  "singleQuote": false,
-  "trailingComma": "es5",
-  "bracketSpacing": true,
-  "plugins": [
-    "prettier-plugin-jinja-template",
-    "prettier-plugin-tailwindcss"
-  ],
-  "overrides": [
-    {
-      "files": ["*.html"],
-      "options": {
-        "parser": "jinja-template"
-      }
-    },
-    {
-      "files": ["*.js", "*.json", "*.css"],
-      "options": {
-        "tabWidth": 2
-      }
-    }
-  ]
+    "printWidth": 100,
+    "tabWidth": 4,
+    "useTabs": false,
+    "semi": true,
+    "singleQuote": false,
+    "trailingComma": "es5",
+    "bracketSpacing": true,
+    "plugins": ["prettier-plugin-jinja-template"],
+    "overrides": [
+        {
+            "files": ["*.html"],
+            "options": {
+                "parser": "jinja-template"
+            }
+        },
+        {
+            "files": ["*.js", "*.json", "*.css"],
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
 }

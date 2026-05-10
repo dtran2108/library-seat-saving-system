@@ -1,0 +1,110 @@
+{% extends "dashboard-layout.html" %}
+
+{# Import Macros #}
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/badge.html" import Badge %}
+{% from "components/ui/tabs.html" import Tabs %}
+{% from "components/ui/page-header.html" import PageHeader %}
+
+{% block title %}My Bookings{% endblock %}
+
+{% block content %}
+
+    {# --- MOCK DATA FOR UI TESTING (Remove when connecting backend) --- #}
+    {%
+        set upcoming_bookings = [
+            {'id': 1, 'seat_number': 'A3', 'booking_date': 'Saturday, May 10, 2026', 'start_time': '09:00', 'end_time': '12:00', 'status': 'confirmed'},
+            {'id': 2, 'seat_number': 'B5', 'booking_date': 'Monday, May 12, 2026', 'start_time': '14:00', 'end_time': '17:00', 'status': 'confirmed'}
+        ]
+    %}
+    {%
+        set history_bookings = [
+            {'id': 3, 'seat_number': 'C1', 'booking_date': 'Friday, May 2, 2026', 'start_time': '08:00', 'end_time': '11:00', 'status': 'completed'},
+            {'id': 4, 'seat_number': 'A1', 'booking_date': 'Wednesday, April 30, 2026', 'start_time': '13:00', 'end_time': '15:00', 'status': 'cancelled'}
+        ]
+    %}
+    {# ----------------------------------------------------------------- #}
+
+    <div class="p-6 max-w-3xl mx-auto">
+        {{ PageHeader("My Bookings", "Manage your study room reservations.", icon="calendar-check") }}
+
+        {# Tab Switcher #}
+        {% call(tab) Tabs(
+            tabs=["upcoming", "history"],
+            labels={"upcoming": "Upcoming (" ~ upcoming_bookings|length ~ ")", "history": "History"},
+            default="upcoming",
+            id="bookings-tabs"
+        ) %}
+            {% if tab == "upcoming" %}
+                {# --- Upcoming Tab Content --- #}
+                {% if not upcoming_bookings %}
+                    <div class="bg-card border border-border rounded-2xl p-10 text-center">
+                        {{ Icon('clock', class="w-8 h-8 text-muted-foreground mx-auto mb-2") }}
+                        <p class="text-muted-foreground">No upcoming bookings.</p>
+                    </div>
+                {% else %}
+                    <div class="flex flex-col gap-3">
+                        {% for b in upcoming_bookings %}
+                            <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center gap-2">
+                                        {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
+                                        <span class="font-semibold text-foreground">Seat {{ b.seat_number }}</span>
+                                        {{ Badge(b.status) }}
+                                    </div>
+                                    <p class="text-sm text-muted-foreground ml-6">
+                                        {{ b.booking_date }}
+                                    </p>
+                                    <p class="text-sm text-muted-foreground ml-6">
+                                        {{ b.start_time }} – {{ b.end_time }}
+                                    </p>
+                                </div>
+
+                                {% if b.status == "confirmed" %}
+                                    <form action="#" method="POST" class="shrink-0">
+                                        <input type="hidden" name="booking_id" value="{{ b.id }}" />
+                                        {% call Button(variant="outline", size="sm", class="text-destructive border-destructive/30 hover:bg-destructive/5") %}
+                                            {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
+                                            Cancel
+                                        {% endcall %}
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+            {% elif tab == "history" %}
+                {# --- History Tab Content --- #}
+                {% if not history_bookings %}
+                    <div class="bg-card border border-border rounded-2xl p-10 text-center">
+                        {{ Icon('clock', class="w-8 h-8 text-muted-foreground mx-auto mb-2") }}
+                        <p class="text-muted-foreground">No history bookings.</p>
+                    </div>
+                {% else %}
+                    <div class="flex flex-col gap-3">
+                        {% for b in history_bookings %}
+                            <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div class="flex flex-col gap-1">
+                                    <div class="flex items-center gap-2">
+                                        {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
+                                        <span class="font-semibold text-foreground">Seat {{ b.seat_number }}</span>
+                                        {{ Badge(b.status) }}
+                                    </div>
+                                    <p class="text-sm text-muted-foreground ml-6">
+                                        {{ b.booking_date }}
+                                    </p>
+                                    <p class="text-sm text-muted-foreground ml-6">
+                                        {{ b.start_time }} – {{ b.end_time }}
+                                    </p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% endcall %}
+    </div>
+
+{% endblock %}

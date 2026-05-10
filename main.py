@@ -52,10 +52,25 @@ def sign_up():
         message = "Invalid login credentials!"
     return render_template("auth/sign-up.html", form=sign_up_form, message=message)
 
-@app.route("/dashboard", methods=["GET","POST"])
-def dashboard():
-    return render_template("dashboard/dashboard.html")
+@app.route("/admin-dashboard", methods=["GET","POST"])
+def admin_dashboard():
+    return render_template("dashboard/admin-dashboard.html")
 
+@app.route("/dashboard", methods=["GET","POST"])
+def user_dashboard():
+    return render_template("dashboard/user-dashboard.html")
+
+@app.route("/seat-map")
+def seat_map():
+    return render_template("dashboard/seat-map.html")
+
+@app.route("/my-bookings")
+def my_bookings():
+    return render_template("dashboard/my-bookings.html")
+
+@app.route("/manage-users")
+def manage_users():
+    return render_template("dashboard/manage-users.html")
  
 if __name__ == "__main__":
     app.run(debug=True)

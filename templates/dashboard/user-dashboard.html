@@ -1,0 +1,89 @@
+{% extends "dashboard-layout.html" %}
+
+{# Import Macros #}
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/page-header.html" import PageHeader %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+    {# --- MOCK DATA FOR UI TESTING (Remove when connecting backend) --- #}
+    {% set user_name = "Duc" %}
+    {%
+        set upcoming_bookings = [
+            {'id': 1, 'seat_number': 'A3', 'booking_date': 'Saturday, May 10', 'start_time': '09:00', 'end_time': '12:00', 'status': 'confirmed'},
+            {'id': 2, 'seat_number': 'B5', 'booking_date': 'Monday, May 12', 'start_time': '14:00', 'end_time': '17:00', 'status': 'confirmed'},
+            {'id': 3, 'seat_number': 'C1', 'booking_date': 'Wednesday, May 14', 'start_time': '08:00', 'end_time': '11:00', 'status': 'confirmed'}
+        ]
+    %}
+    {# ----------------------------------------------------------------- #}
+
+    <div class="p-6 max-w-4xl mx-auto">
+        <div class="mb-8">
+            <h1 class="font-playfair text-3xl font-bold text-foreground">
+                Welcome back, {{ user_name }}!
+            </h1>
+            <p class="text-muted-foreground mt-1">Manage your study room reservations.</p>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            <a href="{{ url_for('seat_map') }}">
+                <div class="bg-primary text-primary-foreground rounded-2xl p-5 hover:bg-primary/90 transition-colors cursor-pointer">
+                    {{ Icon('map', class="w-6 h-6 mb-3 opacity-80") }}
+                    <h3 class="font-semibold text-lg">Book a Seat</h3>
+                    <p class="text-sm opacity-80 mt-1">See real-time availability and reserve now</p>
+                    <div class="flex items-center gap-1 mt-3 text-sm font-medium">
+                        Open Seat Map {{ Icon('arrow-right', class="w-4 h-4") }}
+                    </div>
+                </div>
+            </a>
+            <a href="{{ url_for('my_bookings') }}">
+                <div class="bg-card border border-border rounded-2xl p-5 hover:shadow-md transition-shadow cursor-pointer">
+                    {{ Icon('calendar-check', class="w-6 h-6 mb-3 text-primary") }}
+                    <h3 class="font-semibold text-lg text-foreground">My Bookings</h3>
+                    <p class="text-sm text-muted-foreground mt-1">View, modify or cancel reservations</p>
+                    <div class="flex items-center gap-1 mt-3 text-sm font-medium text-primary">
+                        View all {{ Icon('arrow-right', class="w-4 h-4") }}
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Upcoming Reservations -->
+        <div>
+            <h2 class="font-semibold text-foreground mb-3 text-lg">Upcoming Reservations</h2>
+
+            {% if not upcoming_bookings %}
+                <div class="bg-card border border-border rounded-2xl p-8 text-center">
+                    {{ Icon('clock', class="w-8 h-8 text-muted-foreground mx-auto mb-2") }}
+                    <p class="text-muted-foreground">No upcoming bookings.</p>
+                    <a href="{{ url_for('seat_map') }}" class="inline-block mt-4">
+                        {{ Button("Book a seat now", size="sm") }}
+                    </a>
+                </div>
+            {% else %}
+                <div class="flex flex-col gap-3">
+                    {% for b in upcoming_bookings %}
+                        <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between">
+                            <div>
+                                <p class="font-semibold text-foreground">Seat {{ b.seat_number }}</p>
+                                <p class="text-sm text-muted-foreground">
+                                    {{ b.booking_date }} · {{ b.start_time }} – {{ b.end_time }}
+                                </p>
+                            </div>
+                            <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Confirmed</span>
+                        </div>
+                    {% endfor %}
+
+                    <a href="{{ url_for('my_bookings') }}" class="text-sm text-primary font-medium hover:underline mt-1">
+                        View all bookings →
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+{% endblock %}

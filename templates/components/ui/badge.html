@@ -1,0 +1,46 @@
+{# 
+    Badge component — a small status/role indicator pill.
+    
+    Usage:
+        {{ Badge("confirmed") }}
+        {{ Badge("admin", variant="primary") }}
+        {{ Badge("cancelled", variant="destructive") }}
+        {{ Badge("student", variant="secondary") }}
+#}
+{% macro Badge(text, variant="auto", class="") %}
+{#
+    variant="auto" will infer the color from the text value.
+    You can also pass explicit variants: "success", "destructive", "warning", "secondary", "primary", "muted"
+#}
+{% if variant == "auto" %}
+    {# Auto-detect based on common status/role strings #}
+    {% if text in ['confirmed', 'active', 'available'] %}
+        {% set variant = "success" %}
+    {% elif text in ['cancelled', 'denied', 'blocked'] %}
+        {% set variant = "destructive" %}
+    {% elif text in ['completed', 'expired', 'inactive'] %}
+        {% set variant = "muted" %}
+    {% elif text in ['admin'] %}
+        {% set variant = "primary" %}
+    {% elif text in ['pending', 'warning'] %}
+        {% set variant = "warning" %}
+    {% else %}
+        {% set variant = "secondary" %}
+    {% endif %}
+{% endif %}
+
+{% set styles = {
+    'success': 'bg-green-100 text-green-700',
+    'destructive': 'bg-red-100 text-red-600',
+    'warning': 'bg-amber-100 text-amber-700',
+    'muted': 'bg-gray-100 text-gray-500',
+    'primary': 'bg-primary/15 text-primary',
+    'secondary': 'bg-secondary text-secondary-foreground'
+} %}
+
+{% set style = styles.get(variant, styles['secondary']) %}
+
+<span class="px-2 py-0.5 rounded-full text-xs font-medium capitalize {{ style }} {{ class }}">
+    {{ text }}
+</span>
+{% endmacro %}

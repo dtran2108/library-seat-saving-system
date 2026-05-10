@@ -1,0 +1,22 @@
+{# 
+    PageHeader component — consistent page title section.
+    
+    Usage:
+        {{ PageHeader("Seat Map", "Select a date and click an available seat to book.", icon="map") }}
+        {{ PageHeader("My Bookings", "Manage your study room reservations.") }}
+#}
+{% from "components/ui/icon.html" import Icon %}
+
+{% macro PageHeader(title, description="", icon="", class="") %}
+<div class="mb-6 {{ class }}">
+    <h1 class="font-playfair text-3xl font-bold text-foreground {{ 'flex items-center gap-2' if icon else '' }}">
+        {% if icon %}
+            {{ Icon(icon, class="w-7 h-7 text-primary") }}
+        {% endif %}
+        {{ title }}
+    </h1>
+    {% if description %}
+        <p class="text-muted-foreground mt-1">{{ description }}</p>
+    {% endif %}
+</div>
+{% endmacro %}

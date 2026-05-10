@@ -1,0 +1,70 @@
+{% extends "dashboard-layout.html" %}
+
+{# Import Macros #}
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/badge.html" import Badge %}
+{% from "components/ui/page-header.html" import PageHeader %}
+
+{% block title %}Manage Users{% endblock %}
+
+{% block content %}
+
+    {# --- MOCK DATA FOR UI TESTING (Remove when connecting backend) --- #}
+    {%
+        set users = [
+            {'id': 1, 'full_name': 'Admin User', 'email': 'admin@nsysu.edu.tw', 'student_id': 'M000001', 'role': 'admin'},
+            {'id': 2, 'full_name': 'Duc Tran', 'email': 'duc.tran@nsysu.edu.tw', 'student_id': 'M135790', 'role': 'student'},
+            {'id': 3, 'full_name': '', 'email': 'newuser@student.nsysu.edu.tw', 'student_id': '', 'role': 'student'},
+            {'id': 4, 'full_name': 'Chen Wei', 'email': 'chen.wei@nsysu.edu.tw', 'student_id': 'M246801', 'role': 'student'},
+            {'id': 5, 'full_name': 'Lin Mei', 'email': 'lin.mei@nsysu.edu.tw', 'student_id': 'M112233', 'role': 'admin'}
+        ]
+    %}
+    {% set current_user_id = 1 %}
+    {# ----------------------------------------------------------------- #}
+
+    <div class="p-6 max-w-4xl mx-auto">
+        {{ PageHeader("User Management", "View and manage library patron accounts.", icon="users") }}
+
+        <div class="bg-card border border-border rounded-2xl overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-muted">
+                    <tr>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Student ID</th>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
+                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                        <tr class="{{ 'bg-muted/30' if loop.index is odd else '' }}">
+                            <td class="px-4 py-3 font-medium text-foreground">{{ u.full_name or '—' }}</td>
+                            <td class="px-4 py-3 text-muted-foreground">{{ u.email }}</td>
+                            <td class="px-4 py-3 text-muted-foreground hidden sm:table-cell">{{ u.student_id or '—' }}</td>
+                            <td class="px-4 py-3">
+                                {{ Badge(u.role or 'student', variant='primary' if u.role == 'admin' else 'secondary') }}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% if u.id != current_user_id %}
+                                    <form action="#" method="POST" class="inline">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}" />
+                                        {{ Button(
+                                            "Make " ~ ("Student" if u.role == "admin" else "Admin"),
+                                            variant="ghost",
+                                            size="sm",
+                                            type="submit",
+                                            class="text-xs h-7"
+                                        ) }}
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+{% endblock %}

@@ -1,0 +1,19 @@
+{% from "components/ui/icon.html" import Icon %}
+
+{% macro DatePicker(id="", name="", value="", label="Date:", wrapper_class="", input_class="") %}
+<div class="flex items-center gap-3 {{ wrapper_class }}">
+    {% if label %}
+    <label {% if id %}for="{{ id }}"{% endif %} class="text-sm font-medium text-foreground flex items-center gap-2">
+        {{ Icon('calendar-check', class="w-4 h-4 text-muted-foreground") }}
+        {{ label }}
+    </label>
+    {% endif %}
+    <input
+        type="date"
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if name %}name="{{ name }}"{% endif %}
+        {% if value %}value="{{ value }}"{% endif %}
+        class="border border-border rounded-xl px-3 py-1.5 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring {{ input_class }}"
+    />
+</div>
+{% endmacro %}

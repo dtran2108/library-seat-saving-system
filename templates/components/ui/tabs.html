@@ -1,0 +1,90 @@
+{# 
+    Tabs component — a ShadcnUI-style tab switcher.
+    
+    Renders the tab bar + tab content panels. Uses vanilla JS for switching.
+    
+    Usage:
+        {% call(tab) Tabs(["upcoming", "history"], default="upcoming", id="bookings-tabs") %}
+            {% if tab == "upcoming" %}
+                <p>Upcoming content here</p>
+            {% elif tab == "history" %}
+                <p>History content here</p>
+            {% endif %}
+        {% endcall %}
+
+    With labels and counts:
+        {% call(tab) Tabs(
+            tabs=["upcoming", "history"],
+            labels={"upcoming": "Upcoming (3)", "history": "History"},
+            default="upcoming",
+            id="my-tabs"
+        ) %}
+            ...
+        {% endcall %}
+#}
+{% macro Tabs(tabs, default="", id="tabs", labels={}, class="") %}
+{% set default_tab = default or tabs[0] %}
+
+{# Tab buttons #}
+<div class="flex gap-1 bg-muted rounded-xl p-1 w-fit mb-6 {{ class }}" role="tablist">
+    {% for tab in tabs %}
+        {% set is_default = tab == default_tab %}
+        <button
+            type="button"
+            onclick="switchTabGroup('{{ id }}', '{{ tab }}')"
+            id="{{ id }}-btn-{{ tab }}"
+            role="tab"
+            aria-selected="{{ 'true' if is_default else 'false' }}"
+            class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize {{ 'bg-card text-foreground shadow-sm' if is_default else 'text-muted-foreground hover:text-foreground' }}"
+        >
+            {{ labels.get(tab, tab) if labels else tab }}
+        </button>
+    {% endfor %}
+</div>
+
+{# Tab panels — each panel rendered, only the default is visible #}
+{% for tab in tabs %}
+    {% set is_default = tab == default_tab %}
+    <div
+        id="{{ id }}-panel-{{ tab }}"
+        role="tabpanel"
+        class="{{ 'block' if is_default else 'hidden' }}"
+    >
+        {{ caller(tab) }}
+    </div>
+{% endfor %}
+
+{# Inline JS for tab switching (idempotent — won't re-define if already loaded) #}
+<script>
+    if (typeof switchTabGroup === 'undefined') {
+        function switchTabGroup(groupId, activeTab) {
+            // Find all buttons and panels for this group
+            const tablist = document.querySelector(`[role="tablist"]`);
+            const buttons = document.querySelectorAll(`[id^="${groupId}-btn-"]`);
+            const panels = document.querySelectorAll(`[id^="${groupId}-panel-"]`);
+
+            const activeClass = ["bg-card", "text-foreground", "shadow-sm"];
+            const inactiveClass = ["text-muted-foreground", "hover:text-foreground"];
+
+            buttons.forEach(btn => {
+                const tabName = btn.id.replace(`${groupId}-btn-`, '');
+                if (tabName === activeTab) {
+                    btn.classList.add(...activeClass);
+                    btn.classList.remove(...inactiveClass);
+                    btn.setAttribute('aria-selected', 'true');
+                } else {
+                    btn.classList.remove(...activeClass);
+                    btn.classList.add(...inactiveClass);
+                    btn.setAttribute('aria-selected', 'false');
+                }
+            });
+
+            panels.forEach(panel => {
+                const tabName = panel.id.replace(`${groupId}-panel-`, '');
+                panel.classList.toggle('hidden', tabName !== activeTab);
+                panel.classList.toggle('block', tabName === activeTab);
+            });
+        }
+    }
+</script>
+{% endmacro %}
