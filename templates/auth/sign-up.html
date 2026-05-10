@@ -1,6 +1,10 @@
-{% extends "layout.html" %} {% from "components/ui/button.html" import Button %}
-{% from "components/ui/icon.html" import Icon %} {% from
-"components/ui/input.html" import Input %} {% block title %}Login{% endblock %}
+{% extends "layout.html" %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/input.html" import Input %}
+
+{% block title %}Sign Up{% endblock %}
+
 {% block content %}
 <div class="min-h-screen bg-background flex items-center justify-center px-4">
   <div class="w-full max-w-sm">
@@ -21,30 +25,58 @@
 
     <!-- Card Section -->
     <div class="bg-card border border-border rounded-2xl p-6 shadow-sm">
-      <form method="POST" action="" class="space-y-6">
+      <form method="POST" action="" class="space-y-4">
         {{ form.hidden_tag() }}
 
+        {# Display server-side error message (e.g. "Student ID already exists") #}
+        {% if message %}
+          <div class="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+            {{ message }}
+          </div>
+        {% endif %}
+
+        {# Student ID (maps to uId in ER model) #}
         <div class="space-y-1">
-          {{ form.username.label(class="text-sm font-medium leading-none
-          text-foreground") }} {{ Input(form.username) }} {% for error in
-          form.username.errors %}
-          <span class="text-sm text-destructive">[{{ error }}]</span>
+          {{ form.student_id.label(class="text-sm font-medium leading-none text-foreground") }}
+          {{ Input(form.student_id) }}
+          {% for error in form.student_id.errors %}
+            <span class="text-sm text-destructive">{{ error }}</span>
           {% endfor %}
         </div>
 
+        {# Full Name (maps to uname in ER model) #}
         <div class="space-y-1">
-          {{ form.password.label(class="text-sm font-medium leading-none
-          text-foreground") }} {{ Input(form.password) }} {% for error in
-          form.password.errors %}
-          <span class="text-sm text-destructive">[{{ error }}]</span>
+          {{ form.full_name.label(class="text-sm font-medium leading-none text-foreground") }}
+          {{ Input(form.full_name) }}
+          {% for error in form.full_name.errors %}
+            <span class="text-sm text-destructive">{{ error }}</span>
           {% endfor %}
         </div>
 
+        {# Phone Number (maps to phoneNo in ER model) #}
         <div class="space-y-1">
-          {{ form.confirm_password.label(class="text-sm font-medium leading-none
-          text-foreground") }} {{ Input(form.confirm_password) }} {% for error in
-          form.confirm_password.errors %}
-          <span class="text-sm text-destructive">[{{ error }}]</span>
+          {{ form.phone_no.label(class="text-sm font-medium leading-none text-foreground") }}
+          {{ Input(form.phone_no) }}
+          {% for error in form.phone_no.errors %}
+            <span class="text-sm text-destructive">{{ error }}</span>
+          {% endfor %}
+        </div>
+
+        {# Password #}
+        <div class="space-y-1">
+          {{ form.password.label(class="text-sm font-medium leading-none text-foreground") }}
+          {{ Input(form.password) }}
+          {% for error in form.password.errors %}
+            <span class="text-sm text-destructive">{{ error }}</span>
+          {% endfor %}
+        </div>
+
+        {# Confirm Password #}
+        <div class="space-y-1">
+          {{ form.confirm_password.label(class="text-sm font-medium leading-none text-foreground") }}
+          {{ Input(form.confirm_password) }}
+          {% for error in form.confirm_password.errors %}
+            <span class="text-sm text-destructive">{{ error }}</span>
           {% endfor %}
         </div>
 
@@ -65,9 +97,7 @@
       </a>
     </p>
     <p class="text-center text-sm text-muted-foreground mt-2">
-      <a href="{{ url_for('index') }}" class="hover:underline"
-        >← Back to home</a
-      >
+      <a href="{{ url_for('index') }}" class="hover:underline">← Back to home</a>
     </p>
   </div>
 </div>

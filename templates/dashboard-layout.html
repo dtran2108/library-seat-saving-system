@@ -87,22 +87,20 @@
                     {% if current_user %}
                         <div class="px-3 py-2 mb-2">
                             <p class="text-xs font-medium text-sidebar-foreground truncate">
-                                {{ current_user.full_name or current_user.email }}
+                                {{ current_user['uname'] }}
                             </p>
                             <p class="text-xs text-sidebar-foreground/70 capitalize">
-                                {{ current_user.role }}
+                                {{ current_user['role'] }}
                             </p>
                         </div>
                     {% endif %}
 
-                    <form action="{{ url_for('index') }}" method="POST">
-                        <button
-                            type="submit"
-                            class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground w-full transition-colors"
-                        >
-                            {{ Icon('log-out', class="w-4 h-4") }} Log out
-                        </button>
-                    </form>
+                    <a
+                        href="{{ url_for('logout') }}"
+                        class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground w-full transition-colors"
+                    >
+                        {{ Icon('log-out', class="w-4 h-4") }} Log out
+                    </a>
                 </div>
             </aside>
 
@@ -151,18 +149,14 @@
                     {# {% endif %} #}
 
                     {# Logout #}
-                    <form
-                        action="{{ url_for('index') }}"
-                        method="POST"
-                        class="mt-2 pt-2 border-t border-border"
-                    >
-                        <button
-                            type="submit"
+                    <div class="mt-2 pt-2 border-t border-border">
+                        <a
+                            href="{{ url_for('logout') }}"
                             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:bg-accent hover:text-foreground w-full"
                         >
                             {{ Icon('log-out', class="w-4 h-4") }} Log out
-                        </button>
-                    </form>
+                        </a>
+                    </div>
                 </div>
             </div>
 
