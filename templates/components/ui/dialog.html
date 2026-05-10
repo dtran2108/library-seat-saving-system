@@ -1,0 +1,79 @@
+{#
+    Dialog component — a ShadcnUI-style modal overlay.
+
+    Usage (basic):
+        {% call Dialog(id="my-dialog", title="Edit Item") %}
+            <p>Dialog body content here</p>
+        {% endcall %}
+
+    Usage (with custom max-width):
+        {% call Dialog(id="confirm-dialog", title="Are you sure?", max_width="max-w-xs") %}
+            <p>This action cannot be undone.</p>
+        {% endcall %}
+
+    Open/close from JS:
+        openDialog('my-dialog')
+        closeDialog('my-dialog')
+#}
+{% from "components/ui/icon.html" import Icon %}
+
+{% macro Dialog(id, title="", max_width="max-w-sm") %}
+{# Overlay #}
+<div
+    id="{{ id }}"
+    class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+    onclick="if(event.target===this) closeDialog('{{ id }}')"
+>
+    {# Panel #}
+    <div
+        class="bg-card border border-border rounded-2xl shadow-xl w-full {{ max_width }} p-6 transform transition-all duration-200 scale-95 opacity-0"
+        id="{{ id }}-panel"
+    >
+        {# Header #}
+        {% if title %}
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-playfair text-xl font-bold text-foreground">{{ title }}</h2>
+            <button
+                type="button"
+                onclick="closeDialog('{{ id }}')"
+                class="text-muted-foreground hover:text-foreground transition-colors"
+            >
+                {{ Icon('x', class="w-5 h-5") }}
+            </button>
+        </div>
+        {% endif %}
+
+        {# Body #}
+        {{ caller() }}
+    </div>
+</div>
+
+{# Dialog open/close JS (idempotent) #}
+<script>
+    if (typeof openDialog === 'undefined') {
+        function openDialog(id) {
+            const overlay = document.getElementById(id);
+            const panel = document.getElementById(id + '-panel');
+            if (!overlay) return;
+            overlay.classList.remove('hidden');
+            // Trigger enter animation on next frame
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeDialog(id) {
+            const overlay = document.getElementById(id);
+            const panel = document.getElementById(id + '-panel');
+            if (!overlay) return;
+            // Exit animation
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 200);
+        }
+    }
+</script>
+{% endmacro %}

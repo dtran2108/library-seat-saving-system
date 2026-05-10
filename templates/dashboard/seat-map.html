@@ -1,17 +1,14 @@
 {% extends "dashboard-layout.html" %}
 {% from "components/ui/icon.html" import Icon %}
 {% from "components/ui/date-picker.html" import DatePicker %}
+{% from "components/ui/page-header.html" import PageHeader %}
+{% from "components/booking-modal.html" import BookingModal %}
 
 {% block title %}Seat Map{% endblock %}
 
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto">
-    <div class="mb-6">
-        <h1 class="font-playfair text-3xl font-bold text-foreground flex items-center gap-2">
-            {{ Icon('map', class="w-8 h-8 text-primary") }} Seat Map
-        </h1>
-        <p class="text-muted-foreground mt-1">Select a date and click an available seat to book.</p>
-    </div>
+    {{ PageHeader("Seat Map", "Select a date and click an available seat to book.", icon="map") }}
 
     <!-- Date picker -->
     {{ DatePicker(value="2026-05-10", wrapper_class="mb-6") }}
@@ -36,7 +33,7 @@
         </div>
     </div>
 
-    <!-- SeatGrid UI (Mocked for visualization) -->
+    <!-- SeatGrid -->
     <div class="bg-card border border-border rounded-2xl p-6 overflow-x-auto mt-6">
         <div class="flex justify-center mb-8">
             <div class="px-8 py-2 border-2 border-dashed border-muted-foreground/30 rounded-xl text-sm font-medium text-muted-foreground tracking-widest uppercase">
@@ -45,31 +42,46 @@
         </div>
 
         <div class="flex flex-col gap-4 items-center">
-            <!-- Mock rows -->
             {% for row in ['A', 'B', 'C', 'D', 'E'] %}
                 <div class="flex items-center gap-4">
                     <span class="text-sm font-bold text-muted-foreground w-6 text-right">{{ row }}</span>
                     <div class="flex gap-3 flex-wrap">
                         {% for col in range(1, 9) %}
-                            {# Default available status #}
-                            {% set status_class = "bg-green-50 border-green-300 text-green-700 hover:scale-105 cursor-pointer" %}
-                            
-                            {# Mock some other statuses for the UI #}
+                            {# Determine seat status for mock data #}
+                            {% set seat_status = 'available' %}
                             {% if loop.index == 2 and row == 'A' %}
-                                {% set status_class = "bg-red-50 border-red-300 text-red-700 cursor-not-allowed opacity-70" %}
+                                {% set seat_status = 'booked' %}
                             {% elif loop.index == 4 and row == 'B' %}
-                                {% set status_class = "bg-gray-50 border-gray-300 text-gray-400 cursor-not-allowed opacity-70" %}
+                                {% set seat_status = 'blocked' %}
                             {% elif loop.index == 6 and row == 'C' %}
-                                {% set status_class = "bg-primary/20 border-primary text-primary hover:scale-105 cursor-pointer" %}
+                                {% set seat_status = 'yours' %}
                             {% elif loop.index == 5 and row == 'D' %}
-                                {% set status_class = "bg-red-50 border-red-300 text-red-700 cursor-not-allowed opacity-70" %}
+                                {% set seat_status = 'booked' %}
                             {% endif %}
-                            
+
+                            {# Map status → CSS classes #}
+                            {% if seat_status == 'booked' %}
+                                {% set status_class = "bg-red-50 border-red-300 text-red-700 cursor-not-allowed opacity-70" %}
+                            {% elif seat_status == 'blocked' %}
+                                {% set status_class = "bg-gray-50 border-gray-300 text-gray-400 cursor-not-allowed opacity-70" %}
+                            {% elif seat_status == 'yours' %}
+                                {% set status_class = "bg-primary/20 border-primary text-primary hover:scale-105 cursor-pointer" %}
+                            {% else %}
+                                {% set status_class = "bg-green-50 border-green-300 text-green-700 hover:scale-105 cursor-pointer" %}
+                            {% endif %}
+
+                            {% set seat_number = row ~ col %}
+
                             <button
                                 type="button"
                                 class="w-12 h-12 rounded-xl border-2 text-sm font-semibold transition-all duration-150 {{ status_class }}"
+                                {% if seat_status in ['available', 'yours'] %}
+                                    onclick="openBookingModal('{{ seat_number }}')"
+                                {% else %}
+                                    disabled
+                                {% endif %}
                             >
-                                {{ row }}{{ col }}
+                                {{ seat_number }}
                             </button>
                         {% endfor %}
                     </div>
@@ -78,4 +90,8 @@
         </div>
     </div>
 </div>
+
+{# Render the BookingModal (hidden by default, opened via JS) #}
+{{ BookingModal(date="May 10, 2026") }}
+
 {% endblock %}

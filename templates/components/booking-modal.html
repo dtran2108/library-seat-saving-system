@@ -1,0 +1,183 @@
+{#
+    BookingModal component — booking form displayed inside a Dialog.
+
+    This renders the modal hidden by default. Call openBookingModal(seatNumber)
+    from JS to show it with the correct seat pre-filled.
+
+    Usage:
+        {{ BookingModal(date="2026-05-10") }}
+
+    Then in JS:
+        openBookingModal('A3')
+#}
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/dialog.html" import Dialog %}
+
+{% macro BookingModal(date="", id="booking-modal") %}
+
+{%
+    set time_slots = [
+        '08:00', '09:00', '10:00', '11:00', '12:00',
+        '13:00', '14:00', '15:00', '16:00', '17:00',
+        '18:00', '19:00', '20:00'
+    ]
+%}
+
+{% call Dialog(id=id, title="Book Seat") %}
+    {# Seat Info Banner #}
+    <div class="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2 mb-5">
+        {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
+        <span class="font-semibold text-foreground" id="{{ id }}-seat-name">Seat --</span>
+        <span class="text-muted-foreground text-sm ml-auto">{{ date }}</span>
+    </div>
+
+    <form action="#" method="POST">
+        <input type="hidden" name="seat_number" id="{{ id }}-seat-input" value="" />
+        <input type="hidden" name="booking_date" value="{{ date }}" />
+        <input type="hidden" name="start_time" id="{{ id }}-start-input" value="" />
+        <input type="hidden" name="duration" id="{{ id }}-duration-input" value="1" />
+
+        {# Duration Selector #}
+        <div class="mb-4">
+            <label class="text-sm font-medium text-foreground block mb-2">Duration (hours)</label>
+            <div class="flex gap-2" id="{{ id }}-duration-btns">
+                {% for d in [1, 2, 3, 4] %}
+                    <button
+                        type="button"
+                        data-duration="{{ d }}"
+                        onclick="selectDuration('{{ id }}', {{ d }})"
+                        class="flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors {{ 'border-primary bg-primary/10 text-primary' if d == 1 else 'border-border text-muted-foreground hover:border-primary/50' }}"
+                    >
+                        {{ d }}h
+                    </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Time Slots #}
+        <div class="mb-5">
+            <label class="text-sm font-medium text-foreground mb-2 flex items-center gap-1">
+                {{ Icon('clock', class="w-4 h-4") }} Start Time
+            </label>
+            <div class="grid grid-cols-4 gap-1.5 max-h-44 overflow-y-auto mt-2" id="{{ id }}-time-grid">
+                {% for slot in time_slots %}
+                    <button
+                        type="button"
+                        data-slot="{{ slot }}"
+                        onclick="selectTimeSlot('{{ id }}', '{{ slot }}')"
+                        class="py-1.5 rounded-lg text-xs font-medium border transition-colors bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground"
+                    >
+                        {{ slot }}
+                    </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Summary (hidden until a slot is selected) #}
+        <div id="{{ id }}-summary" class="hidden bg-accent/50 rounded-xl px-3 py-2 mb-4 text-sm text-accent-foreground">
+            Booking: <strong id="{{ id }}-summary-start">--</strong> → <strong id="{{ id }}-summary-end">--</strong>
+            (<span id="{{ id }}-summary-duration">1</span>h)
+        </div>
+
+        {# Submit #}
+        {{ Button("Confirm Booking", type="submit", class="w-full") }}
+    </form>
+{% endcall %}
+
+{# BookingModal-specific JS #}
+<script>
+    (function() {
+        const modalId = '{{ id }}';
+
+        // ── State ──
+        let selectedDuration = 1;
+        let selectedSlot = '';
+
+        function addHours(time, hours) {
+            const [h, m] = time.split(':').map(Number);
+            const total = h * 60 + m + hours * 60;
+            const nh = Math.floor(total / 60);
+            const nm = total % 60;
+            return String(nh).padStart(2, '0') + ':' + String(nm).padStart(2, '0');
+        }
+
+        // ── Duration ──
+        window.selectDuration = function(id, d) {
+            if (id !== modalId) return;
+            selectedDuration = d;
+            document.getElementById(id + '-duration-input').value = d;
+
+            // Restyle buttons
+            document.querySelectorAll(`#${id}-duration-btns button`).forEach(btn => {
+                const isActive = Number(btn.dataset.duration) === d;
+                btn.className = 'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors '
+                    + (isActive
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/50');
+            });
+
+            // Re-select the current slot to update summary
+            if (selectedSlot) selectTimeSlot(id, selectedSlot);
+        };
+
+        // ── Time Slot ──
+        window.selectTimeSlot = function(id, slot) {
+            if (id !== modalId) return;
+            selectedSlot = slot;
+            document.getElementById(id + '-start-input').value = slot;
+
+            const endTime = addHours(slot, selectedDuration);
+
+            // Restyle slot buttons
+            document.querySelectorAll(`#${id}-time-grid button`).forEach(btn => {
+                const s = btn.dataset.slot;
+                const isActive = s === slot;
+                btn.className = 'py-1.5 rounded-lg text-xs font-medium border transition-colors '
+                    + (isActive
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground');
+            });
+
+            // Show summary
+            const summary = document.getElementById(id + '-summary');
+            summary.classList.remove('hidden');
+            document.getElementById(id + '-summary-start').textContent = slot;
+            document.getElementById(id + '-summary-end').textContent = endTime;
+            document.getElementById(id + '-summary-duration').textContent = selectedDuration;
+        };
+
+        // ── Public opener ──
+        window.openBookingModal = function(seatNumber) {
+            // Reset state
+            selectedSlot = '';
+            selectedDuration = 1;
+
+            // Reset hidden inputs
+            document.getElementById(modalId + '-seat-input').value = seatNumber;
+            document.getElementById(modalId + '-start-input').value = '';
+            document.getElementById(modalId + '-duration-input').value = '1';
+
+            // Reset UI
+            document.getElementById(modalId + '-seat-name').textContent = 'Seat ' + seatNumber;
+            document.getElementById(modalId + '-summary').classList.add('hidden');
+
+            // Reset duration buttons
+            document.querySelectorAll(`#${modalId}-duration-btns button`).forEach(btn => {
+                const isFirst = Number(btn.dataset.duration) === 1;
+                btn.className = 'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors '
+                    + (isFirst
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/50');
+            });
+
+            // Reset time slot buttons
+            document.querySelectorAll(`#${modalId}-time-grid button`).forEach(btn => {
+                btn.className = 'py-1.5 rounded-lg text-xs font-medium border transition-colors bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground';
+            });
+
+            openDialog(modalId);
+        };
+    })();
+</script>
+{% endmacro %}
