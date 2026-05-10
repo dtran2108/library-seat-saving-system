@@ -1,0 +1,12 @@
+{% macro StatCard(label, value, color="text-foreground") %}
+    <div class="bg-card border border-border rounded-2xl p-4">
+        <p class="text-xs text-muted-foreground mb-1">{{ label }}</p>
+        <p class="text-2xl font-bold {{ color }}">{{ value }}</p>
+    </div>
+{% endmacro %}
+
+{% macro EmptyState(msg) %}
+    <div class="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground">
+        {{ msg }}
+    </div>
+{% endmacro %}

@@ -1,4 +1,7 @@
 from flask import Flask, render_template
+# TODO: Authentication
+# from flask import request, redirect, url_for
+# from flask_login import current_user
 import secrets
 
 from forms import LoginForm, SignUpForm
@@ -12,6 +15,16 @@ app.secret_key = secret
 
 # forms in Flask
 csrf = CSRFProtect(app)
+
+# TODO: Authentication
+# @app.before_request
+# def check_student_id():
+#     # If the user is logged in, doesn't have a student ID, 
+#     # and isn't already on the setup page or logging out/serving static files
+#     if current_user.is_authenticated and not current_user.student_id:
+#         allowed_endpoints = ['profile_setup', 'logout', 'static']
+#         if request.endpoint not in allowed_endpoints:
+#             return redirect(url_for('profile_setup'))
 
 @app.route("/")
 def index():
@@ -38,6 +51,10 @@ def sign_up():
     if sign_up_form.validate_on_submit():
         message = "Invalid login credentials!"
     return render_template("auth/sign-up.html", form=sign_up_form, message=message)
+
+@app.route("/dashboard", methods=["GET","POST"])
+def dashboard():
+    return render_template("dashboard/dashboard.html")
 
  
 if __name__ == "__main__":
