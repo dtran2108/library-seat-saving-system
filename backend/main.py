@@ -8,7 +8,8 @@
 
 import os
 from functools import wraps
-from flask import Flask, render_template, redirect, url_for, session, flash
+from datetime import date, datetime, timedelta
+from flask import Flask, render_template, redirect, url_for, session, flash, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from config import Config
@@ -222,7 +223,7 @@ def user_dashboard():
 @login_required
 def seat_map():
     zones = get_zones_with_seats()
-    return render_template("dashboard/seat-map.html", zones=zones)
+    return render_template("dashboard/seat-map.html", zones=zones, today=date.today().isoformat())
 
 
 @app.route("/my-bookings")
@@ -254,6 +255,62 @@ def admin_dashboard():
         total_seats=total_seats,
         blocked_seats=blocked_seats,
     )
+
+
+@app.route("/api/book", methods=["POST"])
+@login_required
+def api_book():
+    seat_id      = request.form.get('seat_id', '').strip()
+    booking_date = request.form.get('booking_date', '').strip()
+    start_time   = request.form.get('start_time', '').strip()
+    duration     = request.form.get('duration', '').strip()
+
+    if not all([seat_id, booking_date, start_time, duration]):
+        return jsonify(success=False, error='All fields are required.')
+
+    try:
+        seat_id  = int(seat_id)
+        duration = int(duration)
+        if duration not in (1, 2, 3, 4):
+            raise ValueError
+    except ValueError:
+        return jsonify(success=False, error='Invalid seat ID or duration.')
+
+    try:
+        start_dt = datetime.strptime(f'{booking_date} {start_time}', '%Y-%m-%d %H:%M')
+    except ValueError:
+        return jsonify(success=False, error='Invalid date or time format.')
+
+    end_dt = start_dt + timedelta(hours=duration)
+
+    seat = query_db('SELECT seatId, status FROM seats WHERE seatId = ?', (seat_id,), one=True)
+    if not seat:
+        return jsonify(success=False, error='Seat not found.')
+    if seat['status'] != 'available':
+        return jsonify(success=False, error='This seat is no longer available.')
+
+    # Atomic update: only succeeds if no one else claimed the seat between the
+    # check above and now. rowcount == 0 means another request won the race.
+    db = get_db()
+    cur = db.execute(
+        "UPDATE seats SET status = 'booked' WHERE seatId = ? AND status = 'available'",
+        (seat_id,)
+    )
+    if cur.rowcount == 0:
+        return jsonify(success=False, error='This seat was just taken. Please choose another.')
+
+    db.execute(
+        'INSERT INTO reservations (uId, seatId, startTime, endTime, status) VALUES (?, ?, ?, ?, ?)',
+        (
+            session['user_id'],
+            seat_id,
+            start_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            'active',
+        )
+    )
+    db.commit()
+    return jsonify(success=True, message='Seat booked successfully!')
 
 
 @app.route("/manage-users")

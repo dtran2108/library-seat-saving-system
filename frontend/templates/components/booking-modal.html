@@ -1,20 +1,19 @@
 {#
     BookingModal component — booking form displayed inside a Dialog.
 
-    This renders the modal hidden by default. Call openBookingModal(seatNumber)
-    from JS to show it with the correct seat pre-filled.
+    This renders the modal hidden by default. Call openBookingModal(seatId, seatLabel)
+    from JS to show it with the correct seat and date pre-filled.
 
     Usage:
-        {{ BookingModal(date="2026-05-10") }}
+        {{ BookingModal(id="booking-modal") }}
 
     Then in JS:
-        openBookingModal('A3')
+        openBookingModal(seatId, 'Zone Name · A-01')
 #}
 {% from "components/ui/icon.html" import Icon %}
-{% from "components/ui/button.html" import Button %}
 {% from "components/ui/dialog.html" import Dialog %}
 
-{% macro BookingModal(date="", id="booking-modal") %}
+{% macro BookingModal(id="booking-modal") %}
 
 {%
     set time_slots = [
@@ -29,14 +28,15 @@
     <div class="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2 mb-5">
         {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
         <span class="font-semibold text-foreground" id="{{ id }}-seat-name">Seat --</span>
-        <span class="text-muted-foreground text-sm ml-auto">{{ date }}</span>
+        <span class="text-muted-foreground text-sm ml-auto" id="{{ id }}-date-display">--</span>
     </div>
 
-    <form action="#" method="POST">
-        <input type="hidden" name="seat_id" id="{{ id }}-seat-input" value="" />
-        <input type="hidden" name="booking_date" value="{{ date }}" />
-        <input type="hidden" name="start_time" id="{{ id }}-start-input" value="" />
-        <input type="hidden" name="duration" id="{{ id }}-duration-input" value="1" />
+    <form id="{{ id }}-form" action="#" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <input type="hidden" name="seat_id"      id="{{ id }}-seat-input"     value="" />
+        <input type="hidden" name="booking_date" id="{{ id }}-date-input"     value="" />
+        <input type="hidden" name="start_time"   id="{{ id }}-start-input"    value="" />
+        <input type="hidden" name="duration"     id="{{ id }}-duration-input" value="1" />
 
         {# Duration Selector #}
         <div class="mb-4">
@@ -80,8 +80,17 @@
             (<span id="{{ id }}-summary-duration">1</span>h)
         </div>
 
+        {# Inline error message (shown on API failure) #}
+        <div id="{{ id }}-error" class="hidden mb-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2"></div>
+
         {# Submit #}
-        {{ Button("Confirm Booking", type="submit", class="w-full") }}
+        <button
+            type="submit"
+            id="{{ id }}-submit"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 w-full"
+        >
+            Confirm Booking
+        </button>
     </form>
 {% endcall %}
 
@@ -92,14 +101,21 @@
 
         // ── State ──
         let selectedDuration = 1;
-        let selectedSlot = '';
+        let selectedSlot     = '';
+        let currentSeatId    = null;
 
         function addHours(time, hours) {
             const [h, m] = time.split(':').map(Number);
-            const total = h * 60 + m + hours * 60;
-            const nh = Math.floor(total / 60);
-            const nm = total % 60;
-            return String(nh).padStart(2, '0') + ':' + String(nm).padStart(2, '0');
+            const total  = h * 60 + m + hours * 60;
+            return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+        }
+
+        // Convert "2026-05-13" → "May 13, 2026" without timezone shifting.
+        function formatDateDisplay(iso) {
+            const [y, mo, d] = iso.split('-').map(Number);
+            const months = ['January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+            return `${months[mo - 1]} ${d}, ${y}`;
         }
 
         // ── Duration ──
@@ -107,17 +123,12 @@
             if (id !== modalId) return;
             selectedDuration = d;
             document.getElementById(id + '-duration-input').value = d;
-
-            // Restyle buttons
             document.querySelectorAll(`#${id}-duration-btns button`).forEach(btn => {
                 const isActive = Number(btn.dataset.duration) === d;
                 btn.className = 'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors '
-                    + (isActive
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border text-muted-foreground hover:border-primary/50');
+                    + (isActive ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:border-primary/50');
             });
-
-            // Re-select the current slot to update summary
             if (selectedSlot) selectTimeSlot(id, selectedSlot);
         };
 
@@ -126,53 +137,49 @@
             if (id !== modalId) return;
             selectedSlot = slot;
             document.getElementById(id + '-start-input').value = slot;
-
             const endTime = addHours(slot, selectedDuration);
-
-            // Restyle slot buttons
             document.querySelectorAll(`#${id}-time-grid button`).forEach(btn => {
-                const s = btn.dataset.slot;
-                const isActive = s === slot;
+                const isActive = btn.dataset.slot === slot;
                 btn.className = 'py-1.5 rounded-lg text-xs font-medium border transition-colors '
-                    + (isActive
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground');
+                    + (isActive ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground');
             });
-
-            // Show summary
             const summary = document.getElementById(id + '-summary');
             summary.classList.remove('hidden');
-            document.getElementById(id + '-summary-start').textContent = slot;
-            document.getElementById(id + '-summary-end').textContent = endTime;
+            document.getElementById(id + '-summary-start').textContent    = slot;
+            document.getElementById(id + '-summary-end').textContent      = endTime;
             document.getElementById(id + '-summary-duration').textContent = selectedDuration;
         };
 
         // ── Public opener ──
-        // seatId    — integer PK posted to the booking route
-        // seatLabel — display string, e.g. "Learning Plaza A · A-04"
         window.openBookingModal = function(seatId, seatLabel) {
-            // Reset state
-            selectedSlot = '';
+            currentSeatId    = seatId;
+            selectedSlot     = '';
             selectedDuration = 1;
 
-            // Reset hidden inputs
-            document.getElementById(modalId + '-seat-input').value = seatId;
-            document.getElementById(modalId + '-start-input').value = '';
+            // Read today's date from the DatePicker on the seat-map page.
+            const datePicker = document.getElementById('booking-date');
+            const isoDate    = datePicker ? datePicker.value : '';
+
+            document.getElementById(modalId + '-seat-input').value     = seatId;
+            document.getElementById(modalId + '-date-input').value     = isoDate;
+            document.getElementById(modalId + '-start-input').value    = '';
             document.getElementById(modalId + '-duration-input').value = '1';
 
-            // Reset UI
-            document.getElementById(modalId + '-seat-name').textContent = seatLabel || 'Seat ' + seatId;
+            document.getElementById(modalId + '-seat-name').textContent    = seatLabel || 'Seat ' + seatId;
+            document.getElementById(modalId + '-date-display').textContent = isoDate ? formatDateDisplay(isoDate) : '--';
+
             document.getElementById(modalId + '-summary').classList.add('hidden');
+            document.getElementById(modalId + '-error').classList.add('hidden');
+            document.getElementById(modalId + '-error').textContent = '';
 
             // Reset duration buttons
             document.querySelectorAll(`#${modalId}-duration-btns button`).forEach(btn => {
                 const isFirst = Number(btn.dataset.duration) === 1;
                 btn.className = 'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors '
-                    + (isFirst
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border text-muted-foreground hover:border-primary/50');
+                    + (isFirst ? 'border-primary bg-primary/10 text-primary'
+                               : 'border-border text-muted-foreground hover:border-primary/50');
             });
-
             // Reset time slot buttons
             document.querySelectorAll(`#${modalId}-time-grid button`).forEach(btn => {
                 btn.className = 'py-1.5 rounded-lg text-xs font-medium border transition-colors bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground';
@@ -180,6 +187,45 @@
 
             openDialog(modalId);
         };
+
+        // ── Form submit via fetch ──
+        document.getElementById(modalId + '-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            if (!selectedSlot) {
+                const errorEl = document.getElementById(modalId + '-error');
+                errorEl.textContent = 'Please select a start time.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            const submitBtn = document.getElementById(modalId + '-submit');
+            const errorEl   = document.getElementById(modalId + '-error');
+            submitBtn.disabled   = true;
+            submitBtn.textContent = 'Booking…';
+            errorEl.classList.add('hidden');
+
+            try {
+                const res  = await fetch('/api/book', { method: 'POST', body: new FormData(this) });
+                const data = await res.json();
+
+                if (data.success) {
+                    closeDialog(modalId);
+                    if (typeof onSeatBooked === 'function') onSeatBooked(currentSeatId);
+                    if (typeof showToast    === 'function') showToast(data.message, 'success');
+                } else {
+                    errorEl.textContent = data.error || 'Booking failed. Please try again.';
+                    errorEl.classList.remove('hidden');
+                    submitBtn.disabled    = false;
+                    submitBtn.textContent = 'Confirm Booking';
+                }
+            } catch {
+                errorEl.textContent = 'Network error. Please try again.';
+                errorEl.classList.remove('hidden');
+                submitBtn.disabled    = false;
+                submitBtn.textContent = 'Confirm Booking';
+            }
+        });
     })();
 </script>
 {% endmacro %}

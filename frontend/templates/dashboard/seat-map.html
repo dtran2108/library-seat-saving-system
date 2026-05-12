@@ -12,7 +12,7 @@
     {{ PageHeader("Seat Map", "Select a date, then click an available seat to book.", icon="map") }}
 
     {# ── Date Picker ──────────────────────────────────────────────────── #}
-    {{ DatePicker(value="2026-05-10", wrapper_class="mb-6") }}
+    {{ DatePicker(id="booking-date", value=today, wrapper_class="mb-6") }}
 
     {# ── Filter + Search Bar ──────────────────────────────────────────── #}
     <div class="bg-card border border-border rounded-2xl p-4 mb-5">
@@ -54,7 +54,7 @@
                        bg-secondary text-secondary-foreground hover:bg-muted"
             >
                 {{ zone.name }}
-                <span class="ml-1 opacity-60 font-normal">{{ zone.available }}/{{ zone.total }}</span>
+                <span class="ml-1 opacity-60 font-normal" id="pill-count-{{ zone.zoneId }}">{{ zone.available }}/{{ zone.total }}</span>
             </button>
             {% endfor %}
         </div>
@@ -103,17 +103,17 @@
                     </div>
 
                     {% if zone.zone_status == 'maintenance' %}
-                        <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
+                        <span id="zone-badge-{{ zone.zoneId }}" class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
                                      bg-amber-100 text-amber-700">
                             Closed — maintenance
                         </span>
                     {% elif zone.available == 0 %}
-                        <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
+                        <span id="zone-badge-{{ zone.zoneId }}" class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
                                      bg-red-100 text-red-700">
                             Full · 0 / {{ zone.total }}
                         </span>
                     {% else %}
-                        <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
+                        <span id="zone-badge-{{ zone.zoneId }}" class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
                                      bg-green-100 text-green-700">
                             {{ zone.available }} / {{ zone.total }} available
                         </span>
@@ -180,11 +180,12 @@
 
                                     <button
                                         type="button"
+                                        data-seat-id="{{ seat.seatId }}"
                                         title="{{ seat_label }}"
                                         class="w-14 h-14 rounded-xl border-2 text-xs font-semibold
                                                transition-all duration-150 {{ cls }}"
                                         {% if seat.status == 'available' %}
-                                            onclick="openBookingModal({{ seat.seatId }}, {{ seat_label | tojson }})"
+                                            onclick='openBookingModal({{ seat.seatId }}, {{ seat_label | tojson }})'
                                         {% else %}
                                             disabled
                                         {% endif %}
@@ -240,10 +241,52 @@
 </div>
 
 {# Booking modal #}
-{{ BookingModal(date="May 10, 2026") }}
+{{ BookingModal() }}
 
 {# ── Filter JavaScript ────────────────────────────────────────────────── #}
 <script>
+    // ── Post-booking state update ────────────────────────────────────────────
+    // Called by the booking modal after a successful API response.
+    function onSeatBooked(seatId) {
+        const btn = document.querySelector(`[data-seat-id="${seatId}"]`);
+        if (!btn) return;
+
+        // Mark seat as booked visually
+        btn.className = 'w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75';
+        btn.disabled = true;
+        btn.removeAttribute('onclick');
+
+        // Find the zone this seat belongs to
+        const zoneCard = btn.closest('[data-zone-id]');
+        if (!zoneCard) return;
+        const zoneId = zoneCard.dataset.zoneId;
+
+        // Update the header badge (green count → decrement, or switch to "Full")
+        const badge = document.getElementById(`zone-badge-${zoneId}`);
+        if (badge) {
+            const match = badge.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+            if (match) {
+                const newAvail = parseInt(match[1]) - 1;
+                const total    = parseInt(match[2]);
+                if (newAvail <= 0) {
+                    badge.className = 'shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-700';
+                    badge.textContent = `Full · 0 / ${total}`;
+                } else {
+                    badge.textContent = `${newAvail} / ${total} available`;
+                }
+            }
+        }
+
+        // Update the pill count beside the zone name in the filter bar
+        const pill = document.getElementById(`pill-count-${zoneId}`);
+        if (pill) {
+            const match = pill.textContent.match(/(\d+)\/(\d+)/);
+            if (match) {
+                pill.textContent = `${parseInt(match[1]) - 1}/${match[2]}`;
+            }
+        }
+    }
+
     let activePill = 'all';
 
     // ── Pill filter ──────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 {% from "components/ui/icon.html" import Icon %}
 {% from "components/ui/alert-dialog.html" import AlertDialog %}
+{% from "components/ui/toast.html" import ToastContainer %}
 
 {# ── Shared Nav Data ── #}
 {%
@@ -171,6 +172,19 @@
             </main>
         </div>
 
+        {# ── Flash toasts (server-side) ──────────────────────────────────────── #}
+        {{ ToastContainer() }}
+
+        {# ── JS-triggered toast container ────────────────────────────────────── #}
+        {# Lives here permanently so showToast() always has a place to append to. #}
+        <div
+            id="js-toast-container"
+            role="region"
+            aria-label="Notifications"
+            class="fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2
+                   w-88 max-w-[calc(100vw-2rem)] pointer-events-none"
+        ></div>
+
         {# ── Logout confirmation ─────────────────────────────────────────────── #}
         {{ AlertDialog(
             id="logout-confirm",
@@ -182,6 +196,53 @@
         ) }}
 
         <script>
+            // ── Toast helpers (always available for JS-triggered toasts) ──────────
+            const _toastIcons = {
+                success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>',
+                error:   '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+                warning: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+                info:    '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+            };
+            const _toastStyles = {
+                success: { border: 'border-l-available',   icon: 'text-available' },
+                error:   { border: 'border-l-destructive', icon: 'text-destructive' },
+                warning: { border: 'border-l-yellow-500',  icon: 'text-yellow-500' },
+                info:    { border: 'border-l-primary',     icon: 'text-primary' },
+            };
+
+            function dismissToast(el) {
+                if (!el) return;
+                el.classList.add('opacity-0', 'translate-y-2');
+                el.addEventListener('transitionend', () => el.remove(), { once: true });
+            }
+
+            function showToast(message, category) {
+                const container = document.getElementById('js-toast-container');
+                if (!container) return;
+                const style = _toastStyles[category] || _toastStyles.info;
+                const icon  = _toastIcons[category]  || _toastIcons.info;
+                const el = document.createElement('div');
+                el.dataset.toast = '';
+                el.setAttribute('role', 'alert');
+                el.setAttribute('aria-live', 'assertive');
+                el.className = `pointer-events-auto relative flex w-full items-start gap-3 rounded-lg border border-border border-l-4 ${style.border} bg-card p-4 shadow-lg opacity-0 translate-y-2 transition-all duration-300 ease-out`;
+                el.innerHTML = `
+                    <div class="mt-0.5 shrink-0 ${style.icon}">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+                    </div>
+                    <p class="flex-1 text-sm leading-5 text-foreground">${message}</p>
+                    <button onclick="dismissToast(this.closest('[data-toast]'))" aria-label="Dismiss notification" class="-mr-1 -mt-0.5 shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>`;
+                container.appendChild(el);
+                // Two rAF calls ensure the browser has painted the initial opacity-0
+                // state before we remove those classes to trigger the CSS transition.
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    el.classList.remove('opacity-0', 'translate-y-2');
+                }));
+                setTimeout(() => dismissToast(el), 4500);
+            }
+
             document.addEventListener("DOMContentLoaded", () => {
                 const btn = document.getElementById("mobile-menu-btn");
                 const drawer = document.getElementById("mobile-drawer");

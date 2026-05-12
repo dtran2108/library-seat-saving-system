@@ -514,6 +514,9 @@
   .w-56 {
     width: calc(var(--spacing) * 56);
   }
+  .w-88 {
+    width: calc(var(--spacing) * 88);
+  }
   .w-\[22rem\] {
     width: 22rem;
   }
