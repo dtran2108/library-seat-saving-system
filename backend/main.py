@@ -1,15 +1,14 @@
-"""
-main.py — entry point for the Library Seat Saving System.
+# main.py — Flask application entry point.
+#
+# This file does four things:
+#   1. Creates the Flask app and points it at the frontend/ folder.
+#   2. Defines decorators that block pages from unauthenticated users.
+#   3. Defines every URL route (what happens when a browser visits a path).
+#   4. Starts the database on first run.
 
-Handles:
-    - User authentication (login, sign-up, logout)
-    - Route protection via @login_required decorator
-    - current_user injection into all templates
-    - Page routing for dashboard, seat map, bookings, admin pages
-"""
-
+import os
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from config import Config
@@ -17,50 +16,53 @@ from forms import LoginForm, SignUpForm
 from flask_wtf import CSRFProtect
 from db import get_db, close_db, query_db, init_db, get_zones_with_seats
 
-app = Flask(__name__)
+# __file__ always refers to this Python file, so this path is correct no matter
+# which directory you run "flask run" from.
+_FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(_FRONTEND, 'templates'),
+    static_folder=os.path.join(_FRONTEND, 'static'),
+)
 app.config.from_object(Config)
 
-# CSRF protection for all forms
+# Without CSRF protection, a malicious website could submit one of our forms
+# on behalf of a logged-in user without their knowledge.
 csrf = CSRFProtect(app)
 
-# Register database teardown — auto-closes the SQLite connection after each request
+# Registering close_db here means Flask calls it automatically after every
+# request — we never have to remember to close the database connection manually.
 app.teardown_appcontext(close_db)
 
 
-# ──────────────────────────────────────────────
-# Auth Helpers
-# ──────────────────────────────────────────────
+# ── Auth decorators ────────────────────────────────────────────────────────────
+#
+# A decorator wraps a route function with extra logic that runs first.
+# Adding @login_required above a route is like putting a locked door in front
+# of it — the user only gets in if all checks pass.
 
 def login_required(f):
-    """
-    Decorator to protect routes that require authentication.
-
-    Three checks in order:
-      1. Session must contain 'user_id' (i.e. the user went through login).
-      2. The user_id must resolve to a real row in the database — guards
-         against stale cookies left over after a DB reset or user deletion.
-      3. The account must not be suspended.
-
-    Any failure clears the session and redirects to the login page.
-    """
-    @wraps(f)
+    @wraps(f)  # preserves the original function's name so Flask routing still works
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('login'))
 
+        # Checking the database here (not just the session cookie) prevents a
+        # deleted or reset account from staying "logged in" via an old cookie.
         user = query_db(
             'SELECT uId, ustatus FROM users WHERE uId = ?',
             (session['user_id'],),
             one=True
         )
         if not user:
-            # Stale session — the user no longer exists in the database.
             session.clear()
             flash('Your session has expired. Please log in again.', 'warning')
             return redirect(url_for('login'))
 
         if user['ustatus'] == 'suspended':
+            # Clear the session so the user can't retry by going back.
             session.clear()
             flash('Your account has been suspended. Please contact the library staff.', 'error')
             return redirect(url_for('login'))
@@ -70,11 +72,6 @@ def login_required(f):
 
 
 def admin_required(f):
-    """
-    Decorator to protect routes that require admin privileges.
-    
-    Checks that the user is logged in AND has role='admin'.
-    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -88,19 +85,13 @@ def admin_required(f):
     return decorated_function
 
 
+# ── Template context ───────────────────────────────────────────────────────────
+
 @app.context_processor
 def inject_current_user():
-    """
-    Make `current_user` available in all Jinja templates.
-    
-    If the user is logged in (session has 'user_id'), fetch their data
-    from the database. Otherwise, current_user is None.
-    
-    Template usage:
-        {% if current_user %}
-            Hello, {{ current_user.uname }}!
-        {% endif %}
-    """
+    # Templates cannot call Python functions on their own, so we use a context
+    # processor to push data into every template automatically. Any template can
+    # now use {{ current_user }} without the route needing to pass it explicitly.
     current_user = None
     if 'user_id' in session:
         current_user = query_db(
@@ -111,21 +102,18 @@ def inject_current_user():
     return dict(current_user=current_user)
 
 
-# ──────────────────────────────────────────────
-# Database Initialization
-# ──────────────────────────────────────────────
+# ── Database initialisation ────────────────────────────────────────────────────
 
+# app_context() is required here because init_db() calls get_db(), which reads
+# from current_app — a proxy that only works inside a request or app context.
 with app.app_context():
     init_db()
 
 
-# ──────────────────────────────────────────────
-# Public Routes
-# ──────────────────────────────────────────────
+# ── Public routes (no login needed) ───────────────────────────────────────────
 
 @app.route("/")
 def index():
-    """Landing page — shows features and CTA buttons."""
     features = [
         {"icon": "map-pin", "title": "Interactive Seat Map", "desc": "See the full floor plan with real-time availability at a glance."},
         {"icon": "clock", "title": "Easy Booking", "desc": "Reserve a seat for up to 4 hours. No more saving with bags!"},
@@ -137,13 +125,7 @@ def index():
 
 @app.route("/login", methods=['GET', 'POST'])
 def login():
-    """
-    Login page — authenticates students by Student ID and password.
-    
-    GET:  Render login form
-    POST: Validate credentials → set session → redirect to dashboard
-    """
-    # If already logged in, redirect to dashboard
+    # Redirect logged-in users away so they can't see the login page again.
     if 'user_id' in session:
         return redirect(url_for('user_dashboard'))
 
@@ -154,7 +136,6 @@ def login():
         student_id = login_form.student_id.data
         password = login_form.password.data
 
-        # Look up the user by Student ID (uId in ER model)
         user = query_db(
             'SELECT * FROM users WHERE uId = ?',
             (student_id,),
@@ -162,19 +143,20 @@ def login():
         )
 
         if user and check_password_hash(user['password'], password):
-            # Check if the account is suspended
             if user['ustatus'] == 'suspended':
                 message = "Your account has been suspended. Please contact the library staff."
             else:
-                # Successful login — store user ID in session
+                # Storing only the ID (not the whole user object) keeps the
+                # cookie small and avoids stale data on subsequent requests.
                 session['user_id'] = user['uId']
                 flash(f'Welcome back, {user["uname"]}!', 'success')
 
-                # Redirect admin to admin dashboard, students to user dashboard
                 if user['role'] == 'admin':
                     return redirect(url_for('admin_dashboard'))
                 return redirect(url_for('user_dashboard'))
         else:
+            # Use the same error message for both "wrong ID" and "wrong password"
+            # so attackers can't tell which one they got right.
             message = "Invalid Student ID or password."
 
     return render_template("auth/login.html", form=login_form, message=message)
@@ -182,15 +164,6 @@ def login():
 
 @app.route("/sign-up", methods=['GET', 'POST'])
 def sign_up():
-    """
-    Sign-up page — creates a new student account.
-    
-    GET:  Render sign-up form
-    POST: Validate form → hash password → INSERT into users → redirect to login
-    
-    Note: Only students can sign up. Admins are created manually in the database.
-    """
-    # If already logged in, redirect to dashboard
     if 'user_id' in session:
         return redirect(url_for('user_dashboard'))
 
@@ -203,7 +176,6 @@ def sign_up():
         phone_no = sign_up_form.phone_no.data or ''
         password = sign_up_form.password.data
 
-        # Check if a user with this Student ID already exists
         existing_user = query_db(
             'SELECT uId FROM users WHERE uId = ?',
             (student_id,),
@@ -213,10 +185,11 @@ def sign_up():
         if existing_user:
             message = "An account with this Student ID already exists."
         else:
-            # Hash the password before storing
+            # Passwords must never be stored as plain text. generate_password_hash
+            # produces a one-way hash — even if the database is leaked, the original
+            # password cannot be recovered from it.
             hashed_password = generate_password_hash(password)
 
-            # Insert the new user into the database
             db = get_db()
             db.execute(
                 'INSERT INTO users (uId, uname, phoneNo, password, role, ustatus) VALUES (?, ?, ?, ?, ?, ?)',
@@ -232,27 +205,22 @@ def sign_up():
 
 @app.route("/logout")
 def logout():
-    """Log out the current user by clearing the session."""
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
 
-# ──────────────────────────────────────────────
-# Protected Routes — Students
-# ──────────────────────────────────────────────
+# ── Protected routes — students ────────────────────────────────────────────────
 
 @app.route("/dashboard", methods=["GET", "POST"])
 @login_required
 def user_dashboard():
-    """Student dashboard — shows welcome message, quick actions, upcoming bookings."""
     return render_template("dashboard/user-dashboard.html")
 
 
 @app.route("/seat-map")
 @login_required
 def seat_map():
-    """Seat map page — interactive floor plan for booking seats."""
     zones = get_zones_with_seats()
     return render_template("dashboard/seat-map.html", zones=zones)
 
@@ -260,28 +228,24 @@ def seat_map():
 @app.route("/my-bookings")
 @login_required
 def my_bookings():
-    """My Bookings page — view, cancel upcoming and past bookings."""
     return render_template("dashboard/my-bookings.html")
 
 
-# ──────────────────────────────────────────────
-# Protected Routes — Admin
-# ──────────────────────────────────────────────
+# ── Protected routes — admin ───────────────────────────────────────────────────
 
 @app.route("/admin-dashboard", methods=["GET", "POST"])
 @admin_required
 def admin_dashboard():
-    """Admin dashboard — manage bookings and seats."""
     zones = get_zones_with_seats()
 
-    # Aggregate seat stats across all zones in one query.
+    # One query instead of looping over zones — much faster with many zones.
     stats = query_db(
         '''SELECT COUNT(*) AS total,
                   SUM(CASE WHEN status = "maintenance" THEN 1 ELSE 0 END) AS blocked
            FROM seats''',
         one=True
     )
-    total_seats  = stats['total']   or 0
+    total_seats   = stats['total']   or 0
     blocked_seats = stats['blocked'] or 0
 
     return render_template(
@@ -295,13 +259,10 @@ def admin_dashboard():
 @app.route("/manage-users")
 @admin_required
 def manage_users():
-    """Admin user management page — view and update user roles."""
     return render_template("dashboard/manage-users.html")
 
 
-# ──────────────────────────────────────────────
-# Entry Point
-# ──────────────────────────────────────────────
+# ── Entry point ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     app.run(debug=True)

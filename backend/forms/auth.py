@@ -1,15 +1,8 @@
-"""
-forms/auth.py — WTForms form classes for user authentication.
-
-LoginForm:  Student ID + Password
-SignUpForm: Student ID + Full Name + Phone Number + Password + Confirm Password
-
-render_kw notes:
-  - required=True  adds the HTML `required` attribute so browsers enforce
-    presence before the form is ever submitted (first line of defence).
-  - placeholder     gives users a concrete example of the expected value.
-  Fields without DataRequired() deliberately omit required=True.
-"""
+# forms/auth.py — form definitions for login and sign-up.
+#
+# Defining forms in Python (rather than raw HTML) gives us two things:
+#   - Server-side validation that runs even if someone bypasses the browser.
+#   - A CSRF token baked in automatically via FlaskForm.
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
@@ -17,11 +10,13 @@ from wtforms.validators import DataRequired, Length, EqualTo
 
 
 class LoginForm(FlaskForm):
-    """Login form — students log in using their Student ID and password."""
 
     student_id = StringField(
         'Student ID',
         validators=[DataRequired()],
+        # `required=True` adds an HTML attribute that makes the browser refuse
+        # to submit the form if the field is empty — a fast first check.
+        # DataRequired() above is the server-side backup for the same rule.
         render_kw={'required': True, 'placeholder': 'e.g. B123456789'},
     )
     password = PasswordField(
@@ -33,16 +28,12 @@ class LoginForm(FlaskForm):
 
 
 class SignUpForm(FlaskForm):
-    """
-    Sign-up form — collects all fields needed to create a new student account.
-
-    Maps to the ER model's User entity:
-        student_id       → uId (primary key)
-        full_name        → uname
-        phone_no         → phoneNo        (optional)
-        password         → password       (hashed before storing)
-        confirm_password → validation only (not stored)
-    """
+    # Field names below map to the database columns in the users table:
+    #   student_id  → uId (primary key)
+    #   full_name   → uname
+    #   phone_no    → phoneNo  (optional — no DataRequired validator)
+    #   password    → stored as a hash, never the raw value
+    #   confirm_password → used only for validation, never stored
 
     student_id = StringField(
         'Student ID',
@@ -62,6 +53,8 @@ class SignUpForm(FlaskForm):
     )
     phone_no = StringField(
         'Phone Number',
+        # No DataRequired here — phone number is optional, so we also omit
+        # required=True from render_kw to avoid the browser enforcing it.
         render_kw={'placeholder': '0912-345-678 (optional)'},
     )
     password = PasswordField(
@@ -76,6 +69,8 @@ class SignUpForm(FlaskForm):
         'Confirm Password',
         validators=[
             DataRequired(),
+            # EqualTo compares this field's value to another field's value at
+            # submission time. We can't do this with a simple Length check.
             EqualTo('password', message='Passwords must match.'),
         ],
         render_kw={'required': True, 'placeholder': 'Repeat your password'},

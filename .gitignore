@@ -64,10 +64,10 @@ db.sqlite3-journal
 # Flask stuff:
 instance/
 .webassets-cache
-library.db
+backend/library.db
 
-# Generated CSS — rebuild with: npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css
-static/css/output.css
+# Generated CSS — rebuild from frontend/: npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css
+frontend/static/css/output.css
 
 # Scrapy stuff:
 .scrapy

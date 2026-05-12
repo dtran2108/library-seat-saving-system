@@ -1,121 +1,165 @@
 # Library Seat Saving System
 
-**NSYSU MIS205 — Group 6**  
-A web application for reserving library seats at NSYSU. Students log in with their student ID, browse an interactive floor-plan seat map, and book a seat for a time slot. Admins manage zones, seats, and users from a separate dashboard.
+**NSYSU MIS205 — Group 6**
 
-**Stack:** Python · Flask · SQLite · Jinja2 · Tailwind CSS v4
+A web app where students log in with their student ID, browse a live floor-plan seat map, and reserve a seat at the library. Admins get a separate dashboard to manage zones, seats, and users.
+
+**Tech used:** Python · Flask · SQLite · Jinja2 · Tailwind CSS v4
 
 ---
 
-## Getting Started
+## Understanding this project's structure
 
-Follow these steps in order. Every command runs from the project root (the folder that contains `main.py`).
+Most web projects have two distinct sides. This project follows that same split:
 
-### 1. Prerequisites
+```
+library-seat-saving-system/
+├── backend/    ← The Python server. Handles data, login, and page logic.
+└── frontend/   ← The visual layer. HTML templates and CSS styling.
+```
 
-| Tool | Version | Check with |
-|------|---------|------------|
+**Backend** (`backend/`) is Python. It runs on your computer as a server, talks to the database, checks whether you're logged in, and sends the right HTML page back to the browser.
+
+**Frontend** (`frontend/`) is HTML + CSS. It defines what each page *looks* like — the layout, buttons, colours, and forms. In this project, Flask reads these HTML files and fills in the live data before sending them to the browser. The CSS is built by Tailwind, a Node.js tool.
+
+> **Note:** This is not a traditional split where the frontend and backend are two separate running programs. Here the backend *uses* the frontend files — it just helps to keep them in separate folders so UI changes and server logic changes stay organised.
+
+---
+
+## Before you start
+
+You need three tools installed on your computer. Run each "Check with" command in your terminal to see if you already have it.
+
+| Tool | Required version | Check with |
+|------|-----------------|------------|
 | Python | 3.10 or newer | `python3 --version` |
 | Node.js | 18 or newer | `node --version` |
-| npm | bundled with Node | `npm --version` |
+| npm | comes with Node | `npm --version` |
 
-### 2. Clone the repository
+If a command is not found, download the tool from its official website and re-check.
+
+---
+
+## First-time setup
+
+Do these steps once after cloning the repo. After that, jump to [Daily development](#daily-development).
+
+### Step 1 — Get the code
 
 ```bash
 git clone https://github.com/dtran2108/library-seat-saving-system.git
 cd library-seat-saving-system
 ```
 
-### 3. Create and activate a virtual environment
-
-A virtual environment keeps project dependencies isolated from the rest of your system.
+### Step 2 — Create a Python virtual environment
 
 ```bash
-# Create the environment (only needed once)
+# Create the environment (you only do this once)
 python3 -m venv myenv
 
 # Activate it — you must do this every time you open a new terminal
-source myenv/bin/activate        # macOS / Linux
-myenv\Scripts\activate           # Windows
+source myenv/bin/activate      # macOS and Linux
+myenv\Scripts\activate         # Windows
 ```
 
-Your prompt will show `(myenv)` when the environment is active.
+### Step 3 — Install Python packages (backend)
 
-### 4. Install Python dependencies
+Move into the `backend` folder and install the Python dependencies listed in `requirements.txt`:
 
 ```bash
+cd backend
 pip install -r requirements.txt
 ```
 
-### 5. Install Node dependencies (for Tailwind CSS)
+### Step 4 — Install Node packages (frontend)
+
+Open a **second terminal**, move into `frontend`, and install the Node packages:
 
 ```bash
+cd frontend
 npm install
 ```
 
-### 6. Build the CSS
+### Step 5 — Build the CSS
 
-Tailwind scans the templates and generates a single optimised CSS file.
+Still inside `frontend/`, run this to compile the Tailwind CSS:
 
 ```bash
-# One-time build
 npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css
-
-# Watch mode — rebuilds automatically whenever you edit a template
-npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch
 ```
 
-### 7. Configure your environment
+You should see a new file appear at `frontend/static/css/output.css`. This file is what the browser actually loads. Never edit it by hand — it gets overwritten every time you rebuild.
+
+### Step 6 — Create your environment file
+
+Still in `backend/`, copy the example file:
 
 ```bash
-# Copy the example file
 cp .env.example .env
 ```
 
-Open `.env` and replace the placeholder with a real secret key:
+Now open `backend/.env` and replace the placeholder with a real secret key. You can generate one with:
 
 ```bash
-# Generate a strong key
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Paste the output as the value of `SECRET_KEY` in `.env`. For local development the fallback key in `config.py` works fine, but **never use it in production**.
+Copy the output and paste it as the value of `SECRET_KEY` in `.env`. For local development this step is optional — the app has a fallback key built in — but get in the habit of doing it.
 
-### 8. Run the development server
+### Step 7 — Start the server
+
+From `backend/`:
 
 ```bash
 flask --app main run --debug
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. If you see the landing page, everything is working.
 
 ---
 
-## Configuring the Database
+## Daily development
 
-### How it is created
+Every time you sit down to work, you need two terminals running at the same time:
 
-The database (`library.db`) is created automatically the first time you start the server. Flask calls `init_db()` inside `main.py`:
-
-```python
-with app.app_context():
-    init_db()
+**Terminal 1 — CSS watcher** (from `frontend/`)
+```bash
+source ../myenv/bin/activate
+cd frontend
+npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch
 ```
+Leave this running. It automatically rebuilds the CSS whenever you edit a template.
 
-`init_db()` runs `schema.sql`, which uses `CREATE TABLE IF NOT EXISTS` everywhere, so it is safe to call on every startup — it will not overwrite existing data.
+**Terminal 2 — Flask server** (from `backend/`)
+```bash
+source ../myenv/bin/activate
+cd backend
+flask --app main run --debug
+```
+Leave this running too. The `--debug` flag auto-restarts the server whenever you save a Python file.
 
-### Seed data
+---
 
-`schema.sql` also contains `INSERT OR IGNORE` statements that pre-populate four zones and 26 seats. These only insert when a row with that primary key does not already exist, so they are idempotent (running them twice is the same as running them once).
+## Database guide
+
+### How the database is created
+
+The database file (`backend/library.db`) is created automatically on the first server start. You do not need to create it yourself. Flask runs `init_db()` at startup, which executes `backend/schema.sql` to create the tables.
+
+`schema.sql` uses `CREATE TABLE IF NOT EXISTS` everywhere, so it is safe to run every startup — it skips tables that already exist.
+
+### Starter data
+
+`schema.sql` also pre-loads four zones (Learning Plaza A/B, Computer Area, Quiet Study Room) and 26 seats. This data is inserted with `INSERT OR IGNORE`, so it only runs once — re-starting the server will not duplicate it.
 
 ### Creating an admin account
 
-New accounts created through the Sign Up page always have `role = 'user'`. To create an admin, open a Python shell inside the project:
+The Sign Up page only creates student accounts. To create an admin, run this one-liner from `backend/` (replace the values in quotes):
 
 ```bash
 python3 -c "
 from werkzeug.security import generate_password_hash
-from db import get_db, init_db
+from db import get_db
 from main import app
 
 with app.app_context():
@@ -125,270 +169,236 @@ with app.app_context():
         ('ADMIN001', 'Admin User', generate_password_hash('yourpassword'), 'admin', 'active')
     )
     db.commit()
-    print('Admin created.')
+    print('Done.')
 "
 ```
 
 ### Resetting the database
 
-Delete `library.db` and restart the server. The file will be re-created from `schema.sql` with fresh seed data.
+Delete the database file and restart the server. It will be recreated from `schema.sql` with fresh starter data.
 
 ```bash
-rm library.db
-flask --app main run --debug
+rm backend/library.db
+cd backend && flask --app main run --debug
 ```
 
 ---
 
-## Project Structure
+## Files at a glance
 
 ```
 library-seat-saving-system/
 │
-├── main.py            ← Flask app: routes, auth decorators, app setup
-├── db.py              ← Database helpers (get_db, query_db, init_db, get_zones_with_seats)
-├── config.py          ← Flask Config class (SECRET_KEY, DATABASE path)
-├── forms/             ← WTForms form classes
-│   ├── __init__.py
-│   └── auth.py        ← LoginForm, SignUpForm
-├── schema.sql         ← Database schema + seed data (source of truth for the DB)
-├── requirements.txt   ← Python dependencies
-├── package.json       ← Node dependencies (Tailwind CLI)
+├── README.md              ← You are here
+├── .gitignore
 │
-├── static/
-│   └── css/
-│       ├── input.css  ← Tailwind entry point (edit this, not output.css)
-│       └── output.css ← GENERATED — do not edit by hand; re-run the build command
+├── backend/               ← Everything the Python server needs
+│   ├── main.py            ← Page routes, login logic, app startup
+│   ├── db.py              ← All database read/write helpers
+│   ├── config.py          ← App settings (secret key, DB path)
+│   ├── schema.sql         ← Defines database tables + starter data
+│   ├── requirements.txt   ← Python packages this project needs
+│   ├── .env.example       ← Copy this to .env and fill in your secret key
+│   └── forms/
+│       ├── __init__.py    ← Makes forms/ a Python package
+│       └── auth.py        ← Login and sign-up form definitions
 │
-└── templates/
-    ├── layout.html            ← Base HTML for public pages (login, sign-up, index)
-    ├── dashboard-layout.html  ← Base HTML for all dashboard pages (sidebar + topbar)
-    ├── index.html
-    ├── auth/
-    │   ├── login.html
-    │   └── sign-up.html
-    ├── dashboard/
-    │   ├── user-dashboard.html
-    │   ├── admin-dashboard.html
-    │   ├── seat-map.html
-    │   ├── my-bookings.html
-    │   └── manage-users.html
-    └── components/            ← Reusable Jinja2 macros (Button, Input, Toast, etc.)
+└── frontend/              ← Everything the browser sees
+    ├── package.json       ← Node packages (just Tailwind CLI)
+    ├── templates/         ← HTML pages (Flask fills these in with data)
+    │   ├── layout.html            ← Shared HTML wrapper for public pages
+    │   ├── dashboard-layout.html  ← Shared HTML wrapper for logged-in pages
+    │   ├── index.html             ← Landing page
+    │   ├── auth/
+    │   │   ├── login.html
+    │   │   └── sign-up.html
+    │   ├── dashboard/
+    │   │   ├── user-dashboard.html
+    │   │   ├── admin-dashboard.html
+    │   │   ├── seat-map.html
+    │   │   ├── my-bookings.html
+    │   │   └── manage-users.html
+    │   └── components/    ← Reusable HTML snippets (Button, Input, Toast…)
+    └── static/
+        └── css/
+            ├── input.css  ← Edit this file to change colours/fonts
+            └── output.css ← Auto-generated — never edit this directly
 ```
 
 ---
 
-## Must-Know Concepts
+## How it all works
 
-This section explains *why* the code is structured the way it is. Understanding these patterns will help you add features without breaking anything.
+You don't need to memorise all of this, but reading it once will save you a lot of confusion when something breaks.
 
 ---
 
-### 1. The Flask Request–Response Cycle
+### When you type a URL, what happens?
 
-Every time a browser makes a request (e.g. `GET /seat-map`), Flask:
+When your browser visits `http://127.0.0.1:5000/seat-map`, here is the sequence:
 
-1. Matches the URL to a **route function** (decorated with `@app.route`).
-2. Runs that function.
-3. The function calls `render_template(...)`, which fills a Jinja2 HTML template with data.
-4. Flask sends the resulting HTML back to the browser as a **response**.
+```
+Browser                 Flask (backend/main.py)           Database
+  |                           |                               |
+  |--- GET /seat-map -------> |                               |
+  |                           |--- SELECT zones, seats -----> |
+  |                           |<-- rows of data ------------- |
+  |                           |                               |
+  |                    fills the HTML template
+  |                    with the data
+  |                           |
+  |<-- finished HTML page --- |
+```
+
+In code, each URL is handled by a **route function** in `backend/main.py`:
 
 ```python
-@app.route("/seat-map")
-@login_required
+@app.route("/seat-map")    # "when someone visits /seat-map..."
+@login_required            # "...first make sure they're logged in..."
 def seat_map():
-    zones = get_zones_with_seats()                          # 1. fetch data from DB
-    return render_template("dashboard/seat-map.html",       # 2. render template
-                           zones=zones)                     # 3. pass data to template
+    zones = get_zones_with_seats()                    # fetch data
+    return render_template("dashboard/seat-map.html", # fill template
+                           zones=zones)               # pass data in
 ```
-
-To add a new page: add a route in `main.py`, create a template in `templates/`, link to it.
 
 ---
 
-### 2. The Database Pattern (`db.py` and Flask `g`)
+### How does the app know you're logged in?
 
-We use Python's built-in `sqlite3` module — no ORM. The pattern has three parts:
-
-**`get_db()`** — opens a connection and caches it in `flask.g`:
+When you log in successfully, Flask saves your student ID inside a **session cookie** — a small piece of data that lives in your browser. Every future request sends that cookie back to the server automatically, so Flask knows who you are.
 
 ```python
-def get_db():
-    if 'db' not in g:               # only open once per request
-        g.db = sqlite3.connect(current_app.config['DATABASE'])
-        g.db.row_factory = sqlite3.Row   # makes rows dict-like: row['uname']
-    return g.db
+session['user_id'] = user['uId']   # save at login
+session.clear()                    # wipe at logout
 ```
 
-`flask.g` is a **per-request scratch space** that Flask clears after every response. Think of it as a temporary shelf that exists only for the duration of one request.
+The cookie is **signed** with the `SECRET_KEY` from `config.py`, so its contents cannot be tampered with. But they can still be read, so we only store the student ID — never passwords or sensitive data.
 
-**`close_db()`** — registered as a teardown handler so Flask closes the connection automatically:
+---
+
+### How is data read from and written to the database?
+
+All database logic lives in `backend/db.py`. For reading, use `query_db()`:
 
 ```python
-app.teardown_appcontext(close_db)   # main.py
+# Get one row (returns None if not found)
+user = query_db('SELECT * FROM users WHERE uId = ?', (student_id,), one=True)
+
+# Get all rows
+zones = query_db('SELECT * FROM zones')
 ```
 
-**`query_db()`** — a thin wrapper around `cursor.execute` for SELECT queries:
+The `?` placeholder is important — it prevents SQL injection by keeping your data separate from the SQL command itself. Never build SQL by joining strings.
 
-```python
-# one=True → return a single row (or None)
-user = query_db('SELECT * FROM users WHERE uId = ?', (uid,), one=True)
-print(user['uname'])
-
-# one=False (default) → return a list
-all_zones = query_db('SELECT * FROM zones')
-```
-
-For INSERT/UPDATE/DELETE, use `get_db()` directly and call `db.commit()`:
+For creating or updating data, use `get_db()` directly and call `.commit()` to save:
 
 ```python
 db = get_db()
 db.execute('INSERT INTO users (...) VALUES (?)', (value,))
-db.commit()
+db.commit()   # without this, the change is not saved
 ```
 
 ---
 
-### 3. WTForms and CSRF Protection
+### How do page templates work?
 
-We use **Flask-WTF** to define form fields and validators in Python (in `forms/auth.py`), then render them in Jinja2 templates. This gives us two things for free:
+All HTML lives in `frontend/templates/`. Each page is a template file that gets filled in with real data by Flask before being sent to the browser. Think of a template like a form letter with blank fields — Flask fills in the blanks.
 
-- **Validation** — `form.validate_on_submit()` checks all validators (DataRequired, Length, EqualTo, etc.) and returns `False` if anything fails, so the form re-renders with error messages.
-- **CSRF tokens** — `csrf = CSRFProtect(app)` in `main.py` and `{{ form.hidden_tag() }}` in every template together prevent cross-site request forgery attacks. Never remove `hidden_tag()` from a form.
+Every page shares a common shell via **template inheritance**. Instead of copying the header/footer/nav into every file, child templates just say "extend this parent" and fill in the unique part:
 
-```python
-# forms/auth.py
-class LoginForm(FlaskForm):
-    student_id = StringField('Student ID', validators=[DataRequired()])
-    password   = PasswordField('Password',  validators=[DataRequired()])
-    submit     = SubmitField('Login')
+```html
+{% extends "dashboard-layout.html" %}
+{% block content %}
+  <h1>This is the unique content of this page.</h1>
+{% endblock %}
 ```
 
-```python
-# main.py route
-if login_form.validate_on_submit():   # True only on POST with valid data + valid CSRF
-    student_id = login_form.student_id.data
-    ...
-```
+`dashboard-layout.html` defines the sidebar, topbar, and all the shared HTML. Change it once and every dashboard page updates automatically.
 
 ---
 
-### 4. Route Protection Decorators
+### What are the files in `frontend/templates/components/`?
 
-Two custom decorators in `main.py` guard protected pages:
+These are **macros** — reusable HTML snippets you call like functions. Instead of copy-pasting the same button HTML in ten places, you define it once and import it:
+
+```html
+{% from "components/ui/button.html" import Button %}
+{{ Button("Save Changes", variant="outline") }}
+```
+
+If the button design needs to change, you change it in one place and every page is updated.
+
+---
+
+### How are forms protected?
+
+Forms need two layers of protection:
+
+1. **Browser validation** — the `required` attribute on an input field stops the form from being submitted if the field is empty. Quick, but easy to bypass (anyone can edit the HTML).
+
+2. **Server validation** — `form.validate_on_submit()` in `main.py` re-checks everything in Python even if someone bypassed the browser. This is the real protection.
+
+3. **CSRF token** — every form includes a hidden token generated by Flask. This stops a malicious website from tricking your browser into submitting a form on your behalf. The `{{ form.hidden_tag() }}` line in every template is what adds that token. Do not remove it.
+
+---
+
+### How are restricted pages protected?
+
+Decorators in `backend/main.py` guard pages that only logged-in (or admin) users should see:
 
 ```python
 @app.route("/seat-map")
-@login_required        # ← blocks unauthenticated users
+@login_required         # turns away anyone not logged in
 def seat_map():
     ...
 
 @app.route("/admin-dashboard")
-@admin_required        # ← blocks non-admin users (implies login check too)
+@admin_required         # turns away anyone who isn't an admin
 def admin_dashboard():
     ...
 ```
 
-`login_required` performs three checks in order:
-1. Is `user_id` in the session? (Did this browser log in?)
-2. Does that `user_id` exist in the `users` table? (Handles DB resets / deleted accounts.)
-3. Is the account not suspended?
-
-If any check fails, the session is cleared and the user is redirected to `/login`.
+`@login_required` does three checks in order: is there a session cookie? → does that user ID still exist in the database? → is the account active? If any check fails, the user is sent back to the login page.
 
 ---
 
-### 5. Jinja2 Template Inheritance
+## Adding new features
 
-All pages share a common HTML shell via **template inheritance**.
+### New page
 
-Public pages (`login.html`, `sign-up.html`) extend `layout.html`:
-
-```jinja2
-{% extends "layout.html" %}
-{% block content %}
-  <p>Page-specific content goes here.</p>
-{% endblock %}
-```
-
-Dashboard pages extend `dashboard-layout.html` (adds sidebar and topbar):
-
-```jinja2
-{% extends "dashboard-layout.html" %}
-{% block content %}
-  ...
-{% endblock %}
-```
-
-`layout.html` and `dashboard-layout.html` define `{% block content %}{% endblock %}` as a placeholder. Child templates fill that placeholder with their own HTML. Every other part of the page (head, nav, footer, toast container) lives only in the parent — one change there updates every page.
-
----
-
-### 6. Reusable Macros (`templates/components/`)
-
-Macros are Jinja2's equivalent of functions or components. They avoid copy-pasting the same HTML in many places.
-
-```jinja2
-{# Import the macro at the top of your template #}
-{% from "components/ui/button.html" import Button %}
-
-{# Call it like a function #}
-{{ Button("Save Changes", variant="outline") }}
-```
-
-To add a new component, create a file in `templates/components/`, define a `{% macro %}`, and import it wherever you need it.
-
----
-
-### 7. Sessions (How Login State Is Stored)
-
-Flask's `session` is a **signed cookie** stored in the browser. We put `user_id` into it at login and clear it at logout:
-
-```python
-session['user_id'] = user['uId']   # login
-session.clear()                    # logout
-```
-
-Because the cookie is **signed** (not encrypted), the server can detect tampering — but the contents are still readable by anyone with the cookie. Never store sensitive data (passwords, tokens) in the session.
-
----
-
-## Development Workflow
-
-### Adding a new page
-
-1. Add a route in `main.py`:
+1. Add a route function in `backend/main.py`:
    ```python
-   @app.route("/my-new-page")
+   @app.route("/my-page")
    @login_required
-   def my_new_page():
-       return render_template("dashboard/my-new-page.html")
+   def my_page():
+       return render_template("dashboard/my-page.html")
    ```
-2. Create `templates/dashboard/my-new-page.html` extending `dashboard-layout.html`.
-3. Add a link to it in `templates/dashboard-layout.html` (the sidebar `nav_items` list).
+2. Create `frontend/templates/dashboard/my-page.html` with `{% extends "dashboard-layout.html" %}`.
+3. Add a link to the sidebar in `frontend/templates/dashboard-layout.html`.
 
-### Adding a new form
+### New form
 
-1. Define the form class in `forms/auth.py` (or a new file under `forms/`).
-2. Export it from `forms/__init__.py`.
-3. Import it in `main.py` and pass an instance to `render_template`.
-4. In the template, call `{{ form.hidden_tag() }}` inside `<form>` and render each field.
+1. Add a form class in `backend/forms/auth.py` (or a new file in `backend/forms/`).
+2. Export it from `backend/forms/__init__.py`.
+3. Import it in `backend/main.py`, create an instance, and pass it to `render_template`.
+4. In the template, add `{{ form.hidden_tag() }}` as the first thing inside `<form>`.
 
-### Adding a new database table
+### New database table
 
-1. Add the `CREATE TABLE IF NOT EXISTS` statement to `schema.sql`.
-2. Add any seed rows using `INSERT OR IGNORE`.
-3. Reset the database (`rm library.db`) and restart the server.
-4. Use `query_db()` for SELECT and `get_db().execute()` + `.commit()` for writes.
+1. Add `CREATE TABLE IF NOT EXISTS ...` to `backend/schema.sql`.
+2. Add any starter rows with `INSERT OR IGNORE`.
+3. Delete `backend/library.db` and restart the server so the new table is created.
+4. Read with `query_db()`, write with `get_db().execute()` + `.commit()`.
 
 ---
 
-## Common Issues
+## Something not working?
 
-| Symptom | Likely cause | Fix |
-|---------|--------------|-----|
-| `RuntimeError: No application found` | Running code outside an app context | Use `with app.app_context():` or run via `flask --app main run` |
-| `400 Bad Request` on form submit | Missing `{{ form.hidden_tag() }}` in template | Add it as the first line inside `<form>` |
-| CSS changes not showing | Tailwind output not rebuilt | Re-run the build command or start watch mode |
-| Old data showing after schema change | DB not reset | `rm library.db` then restart |
-| `OperationalError: no such table` | DB not initialised | Ensure `init_db()` is called in `main.py` and restart |
+| What you see | Why it happens | How to fix it |
+|---|---|---|
+| `RuntimeError: No application found` | You ran a Python file outside Flask's context | Run via `flask --app main run` from `backend/`, or wrap the code in `with app.app_context():` |
+| `400 Bad Request` on a form | The CSRF token is missing | Make sure `{{ form.hidden_tag() }}` is the first line inside your `<form>` tag |
+| Page looks unstyled / CSS missing | The Tailwind output file wasn't built | Run the build command from `frontend/`, or start watch mode |
+| Old schema after adding a table | The database file predates your change | Delete `backend/library.db` and restart the server |
+| `OperationalError: no such table` | The database was not initialized | Make sure the server starts without errors; `init_db()` runs at startup |
+| Login redirects to itself forever | You're already logged in | Clear browser cookies, or open an incognito window |
