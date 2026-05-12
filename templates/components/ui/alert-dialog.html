@@ -1,0 +1,100 @@
+{#
+    AlertDialog — a shadcn/ui-style confirmation modal.
+
+    Key differences from Dialog:
+      - Clicking the backdrop does NOT close it (forces an explicit choice)
+      - No x dismiss button in the header
+      - Footer always has Cancel + a destructive Confirm action
+
+    Usage (trigger anywhere, dialog definition once near end of body):
+        from "components/ui/alert-dialog.html" import AlertDialog
+        <button onclick="openAlertDialog('my-alert')">Delete</button>
+        AlertDialog(id, title, description, confirm_label, confirm_href, cancel_label)
+
+    openAlertDialog(id) / closeAlertDialog(id) are available globally after the
+    first AlertDialog is rendered on the page.
+#}
+
+{% macro AlertDialog(
+    id,
+    title="Are you sure?",
+    description="",
+    confirm_label="Confirm",
+    confirm_href="#",
+    cancel_label="Cancel"
+) %}
+
+{# Shared button base classes, matching button.html #}
+{% set btn_base = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2" %}
+{% set btn_outline     = "border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground" %}
+{% set btn_destructive = "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90" %}
+
+{# Overlay — intentionally no onclick so clicking outside does nothing #}
+<div
+    id="{{ id }}"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="{{ id }}-title"
+    aria-describedby="{{ id }}-desc"
+    class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+>
+    {# Panel #}
+    <div
+        id="{{ id }}-panel"
+        class="bg-card border border-border rounded-2xl shadow-xl w-full max-w-sm p-6
+               transform transition-all duration-200 scale-95 opacity-0"
+    >
+        {# Header #}
+        <h2 id="{{ id }}-title" class="font-semibold text-foreground text-base mb-1">
+            {{ title }}
+        </h2>
+
+        {% if description %}
+        <p id="{{ id }}-desc" class="text-sm text-muted-foreground mb-6">
+            {{ description }}
+        </p>
+        {% endif %}
+
+        {# Footer #}
+        <div class="flex justify-end gap-3 {% if not description %}mt-6{% endif %}">
+            <button
+                type="button"
+                onclick="closeAlertDialog('{{ id }}')"
+                class="{{ btn_base }} {{ btn_outline }}"
+            >
+                {{ cancel_label }}
+            </button>
+            <a
+                href="{{ confirm_href }}"
+                class="{{ btn_base }} {{ btn_destructive }}"
+            >
+                {{ confirm_label }}
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    if (typeof openAlertDialog === 'undefined') {
+        function openAlertDialog(id) {
+            const overlay = document.getElementById(id);
+            const panel   = document.getElementById(id + '-panel');
+            if (!overlay) return;
+            overlay.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+        }
+
+        function closeAlertDialog(id) {
+            const overlay = document.getElementById(id);
+            const panel   = document.getElementById(id + '-panel');
+            if (!overlay) return;
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => overlay.classList.add('hidden'), 200);
+        }
+    }
+</script>
+{% endmacro %}

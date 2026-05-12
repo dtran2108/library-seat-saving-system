@@ -29,9 +29,10 @@ CREATE TABLE IF NOT EXISTS users (
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS zones (
     zoneId   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name     TEXT NOT NULL,                             -- e.g. 'Learning Plaza A'
-    location TEXT NOT NULL,                             -- e.g. '2nd Floor, North Wing'
-    status   TEXT NOT NULL DEFAULT 'active'
+    name     TEXT    NOT NULL,                          -- e.g. 'Learning Plaza A'
+    location TEXT    NOT NULL,                          -- e.g. '2nd Floor, North Wing'
+    cols     INTEGER NOT NULL DEFAULT 4,                -- seats per row in the physical grid
+    status   TEXT    NOT NULL DEFAULT 'active'
                  CHECK (status IN ('active', 'maintenance'))
 );
 
@@ -135,11 +136,15 @@ END;
 -- INSERT OR IGNORE with explicit PKs makes this block idempotent:
 -- on the first run it inserts; on subsequent startups it is a no-op.
 -- ─────────────────────────────────────────────────────────────
-INSERT OR IGNORE INTO zones (zoneId, name, location, status) VALUES
-    (1, 'Learning Plaza A', '2nd Floor, North Wing', 'active'),
-    (2, 'Learning Plaza B', '2nd Floor, South Wing', 'active'),
-    (3, 'Computer Area',    '3rd Floor',             'active'),
-    (4, 'Quiet Study Room', '3rd Floor',             'active');
+-- cols = seats per row in the physical grid layout
+--   Plaza A/B: 4 cols → 2 rows × 4 seats
+--   Computer:  3 cols → 2 rows × 3 seats
+--   Quiet:     4 cols → 1 row  × 4 seats
+INSERT OR IGNORE INTO zones (zoneId, name, location, cols, status) VALUES
+    (1, 'Learning Plaza A', '2nd Floor, North Wing', 4, 'active'),
+    (2, 'Learning Plaza B', '2nd Floor, South Wing', 4, 'active'),
+    (3, 'Computer Area',    '3rd Floor',             3, 'active'),
+    (4, 'Quiet Study Room', '3rd Floor',             4, 'active');
 
 -- Learning Plaza A — 8 seats
 INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES

@@ -1,26 +1,18 @@
 """
-db.py — SQLite database connection helpers for the Library Seat Saving System.
+db.py — SQLite database helpers for the Library Seat Saving System.
 
 Provides:
-    get_db()    — get (or open) the per-request SQLite connection stored in Flask's g
-    close_db()  — teardown handler: close the connection at the end of each request
-    query_db()  — execute a SELECT and return row(s) as dict-like sqlite3.Row objects
-    init_db()   — create all tables from schema.sql (safe to call multiple times)
-
-Usage in main.py:
-    from db import get_db, close_db, query_db, init_db
-    app.teardown_appcontext(close_db)
-    with app.app_context():
-        init_db()
+    get_db()              — get (or open) the per-request SQLite connection
+    close_db()            — teardown handler registered with app.teardown_appcontext
+    query_db()            — SELECT helper returning sqlite3.Row object(s)
+    init_db()             — create all tables from schema.sql (safe to re-run)
+    get_zones_with_seats() — build the full zone+seat list used by seat-map routes
 """
 
 import os
 import sqlite3
 
-from flask import g
-
-# Path to the SQLite database file — stored at the project root.
-DATABASE = os.path.join(os.path.dirname(__file__), 'library.db')
+from flask import current_app, g
 
 
 def get_db():
@@ -30,28 +22,19 @@ def get_db():
     Opens a new connection the first time it is called within a request
     context and caches it in Flask's `g` object so subsequent calls within
     the same request reuse the same connection.
-
-    Returns:
-        sqlite3.Connection with row_factory set to sqlite3.Row so columns
-        can be accessed by name (e.g. row['uname']) as well as by index.
     """
     if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE, detect_types=sqlite3.PARSE_DECLTYPES)
+        g.db = sqlite3.connect(
+            current_app.config['DATABASE'],
+            detect_types=sqlite3.PARSE_DECLTYPES,
+        )
         g.db.row_factory = sqlite3.Row   # allows dict-style column access
-        g.db.execute('PRAGMA foreign_keys = ON')  # enforce FK constraints
+        g.db.execute('PRAGMA foreign_keys = ON')
     return g.db
 
 
 def close_db(e=None):
-    """
-    Close the SQLite connection at the end of the request.
-
-    Registered with app.teardown_appcontext(close_db) in main.py so Flask
-    calls this automatically after every request (or app-context pop).
-
-    Args:
-        e: optional exception passed by Flask's teardown mechanism (ignored).
-    """
+    """Close the SQLite connection at the end of the request."""
     db = g.pop('db', None)
     if db is not None:
         db.close()
@@ -59,22 +42,12 @@ def close_db(e=None):
 
 def query_db(query, args=(), one=False):
     """
-    Execute a SELECT query and return the result as sqlite3.Row object(s).
+    Execute a SELECT query and return row(s) as sqlite3.Row objects.
 
     Args:
-        query (str): SQL SELECT statement with ? placeholders.
-        args  (tuple): values to bind to the placeholders.
-        one   (bool): if True, return a single row (or None if no rows);
-                      if False, return a list of all rows.
-
-    Returns:
-        sqlite3.Row | None  when one=True
-        list[sqlite3.Row]   when one=False
-
-    Example:
-        user = query_db('SELECT * FROM users WHERE uId = ?', (uid,), one=True)
-        if user:
-            print(user['uname'])
+        query: SQL SELECT statement with ? placeholders.
+        args:  values to bind to the placeholders.
+        one:   if True, return a single row (or None); otherwise a list.
     """
     cur = get_db().execute(query, args)
     rv = cur.fetchall()
@@ -86,15 +59,42 @@ def init_db():
     """
     Initialize the database by executing schema.sql.
 
-    Creates all tables (and the auto-release trigger) if they do not exist yet.
-    Safe to call on every startup because schema.sql uses IF NOT EXISTS.
-
-    Must be called inside an application context:
-        with app.app_context():
-            init_db()
+    Uses IF NOT EXISTS everywhere, so it is safe to call on every startup.
+    Must be called inside an application context.
     """
     db = get_db()
-    schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+    schema_path = os.path.join(current_app.root_path, 'schema.sql')
     with open(schema_path, 'r') as f:
         db.executescript(f.read())
     db.commit()
+
+
+def get_zones_with_seats():
+    """
+    Build the full zone list, each entry containing its seats.
+
+    Returns a list of dicts with keys:
+        zoneId, name, location, cols, zone_status,
+        seats     — list of seat dicts (seatId, destNo, status)
+        total     — total seat count in the zone
+        available — count of seats whose status is 'available'
+    """
+    zones = query_db('SELECT * FROM zones ORDER BY zoneId')
+    result = []
+    for zone in zones:
+        seats = query_db(
+            'SELECT seatId, destNo, status FROM seats WHERE zoneId = ? ORDER BY destNo',
+            (zone['zoneId'],),
+        )
+        seat_list = [dict(s) for s in seats]
+        result.append({
+            'zoneId':      zone['zoneId'],
+            'name':        zone['name'],
+            'location':    zone['location'],
+            'cols':        zone['cols'],
+            'zone_status': zone['status'],
+            'seats':       seat_list,
+            'total':       len(seat_list),
+            'available':   sum(1 for s in seat_list if s['status'] == 'available'),
+        })
+    return result

@@ -8,20 +8,17 @@ Handles:
     - Page routing for dashboard, seat map, bookings, admin pages
 """
 
-import os
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from config import Config
 from forms import LoginForm, SignUpForm
 from flask_wtf import CSRFProtect
-from db import get_db, close_db, query_db, init_db
+from db import get_db, close_db, query_db, init_db, get_zones_with_seats
 
 app = Flask(__name__)
-
-# Secret key for session cookies and CSRF protection.
-# Set SECRET_KEY in your environment for production; the fallback is dev-only.
-app.secret_key = os.environ.get('SECRET_KEY', 'nsysu-library-dev-key-change-in-production')
+app.config.from_object(Config)
 
 # CSRF protection for all forms
 csrf = CSRFProtect(app)
@@ -252,43 +249,11 @@ def user_dashboard():
     return render_template("dashboard/user-dashboard.html")
 
 
-def _get_zones_with_seats():
-    """
-    Build a list of zone dicts, each containing its seats.
-
-    Returns a list of dicts with keys:
-        zoneId, name, location, zone_status,
-        seats       — list of seat dicts (seatId, destNo, status)
-        total       — total seat count in the zone
-        available   — count of seats with status='available'
-
-    Used by both seat_map and admin_dashboard so the query lives here once.
-    """
-    zones = query_db('SELECT * FROM zones ORDER BY zoneId')
-    result = []
-    for zone in zones:
-        seats = query_db(
-            'SELECT seatId, destNo, status FROM seats WHERE zoneId = ? ORDER BY destNo',
-            (zone['zoneId'],)
-        )
-        seat_list = [dict(s) for s in seats]
-        result.append({
-            'zoneId':      zone['zoneId'],
-            'name':        zone['name'],
-            'location':    zone['location'],
-            'zone_status': zone['status'],
-            'seats':       seat_list,
-            'total':       len(seat_list),
-            'available':   sum(1 for s in seat_list if s['status'] == 'available'),
-        })
-    return result
-
-
 @app.route("/seat-map")
 @login_required
 def seat_map():
     """Seat map page — interactive floor plan for booking seats."""
-    zones = _get_zones_with_seats()
+    zones = get_zones_with_seats()
     return render_template("dashboard/seat-map.html", zones=zones)
 
 
@@ -307,7 +272,7 @@ def my_bookings():
 @admin_required
 def admin_dashboard():
     """Admin dashboard — manage bookings and seats."""
-    zones = _get_zones_with_seats()
+    zones = get_zones_with_seats()
 
     # Aggregate seat stats across all zones in one query.
     stats = query_db(
