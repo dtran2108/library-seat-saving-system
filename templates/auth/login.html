@@ -8,70 +8,68 @@
 {% block content %}
 <div class="min-h-screen bg-background flex items-center justify-center px-4">
   <div class="w-full max-w-sm">
-    <!-- Header Section -->
+
+    <!-- Header -->
     <div class="text-center mb-8">
-      <div
-        class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-3"
-      >
+      <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-3">
         {{ Icon('book-open', class="w-6 h-6 text-primary") }}
       </div>
-      <h1 class="font-playfair text-2xl font-bold text-foreground">
-        Login to your account
-      </h1>
-      <p class="text-muted-foreground text-sm mt-1">
-        Login to the system with your student ID
-      </p>
+      <h1 class="font-playfair text-2xl font-bold text-foreground">Login to your account</h1>
+      <p class="text-muted-foreground text-sm mt-1">Login to the system with your student ID</p>
     </div>
 
-    <!-- Card Section -->
+    <!-- Card -->
     <div class="bg-card border border-border rounded-2xl p-6 shadow-sm">
-      <form method="POST" action="" class="space-y-6">
+      <form method="POST" action="" class="space-y-5" novalidate>
         {{ form.hidden_tag() }}
 
-        {# Display server-side error message (e.g. "Invalid credentials") #}
+        {# Server-side error (wrong credentials, suspended account, etc.) #}
         {% if message %}
-          <div class="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+          <div class="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>
+            </svg>
             {{ message }}
           </div>
         {% endif %}
 
-        {# Student ID (maps to uId in ER model) #}
-        <div class="space-y-1">
-          {{ form.student_id.label(class="text-sm font-medium leading-none text-foreground") }}
+        {# Student ID — required #}
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-1">
+            {{ form.student_id.label(class="text-sm font-medium text-foreground") }}
+            <span class="text-destructive text-sm leading-none" aria-hidden="true">*</span>
+          </div>
           {{ Input(form.student_id) }}
           {% for error in form.student_id.errors %}
-            <span class="text-sm text-destructive">{{ error }}</span>
+            <p class="text-xs text-destructive">{{ error }}</p>
           {% endfor %}
         </div>
 
-        {# Password #}
-        <div class="space-y-1">
-          {{ form.password.label(class="text-sm font-medium leading-none text-foreground") }}
+        {# Password — required #}
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-1">
+            {{ form.password.label(class="text-sm font-medium text-foreground") }}
+            <span class="text-destructive text-sm leading-none" aria-hidden="true">*</span>
+          </div>
           {{ Input(form.password) }}
           {% for error in form.password.errors %}
-            <span class="text-sm text-destructive">{{ error }}</span>
+            <p class="text-xs text-destructive">{{ error }}</p>
           {% endfor %}
         </div>
 
-        <div>
-          {{ Button(form.submit.label.text, class="w-full", type="submit") }}
-        </div>
+        {{ Button(form.submit.label.text, class="w-full mt-1", type="submit") }}
       </form>
     </div>
 
-    <!-- Footer Links -->
+    <!-- Footer links -->
     <p class="text-center text-sm text-muted-foreground mt-4">
       Don't have an account?
-      <a
-        href="{{ url_for('sign_up') }}"
-        class="text-primary font-medium hover:underline"
-      >
-        Sign up
-      </a>
+      <a href="{{ url_for('sign_up') }}" class="text-primary font-medium hover:underline">Sign up</a>
     </p>
     <p class="text-center text-sm text-muted-foreground mt-2">
       <a href="{{ url_for('index') }}" class="hover:underline">← Back to home</a>
     </p>
+
   </div>
 </div>
 {% endblock %}

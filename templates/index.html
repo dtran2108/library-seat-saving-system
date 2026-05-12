@@ -13,12 +13,18 @@
         >Group 6 | MIS205</span
       >
       <div class="flex gap-2">
-        <a href="{{ url_for('login') }}">
-          {{ Button("Login", variant="ghost") }}
-        </a>
-        <a href="{{ url_for('sign_up') }}">
-          {{ Button("Sign up", variant="primary") }}
-        </a>
+        {% if current_user %}
+          <a href="{{ url_for('admin_dashboard') if current_user['role'] == 'admin' else url_for('user_dashboard') }}">
+            {{ Button("Go to Dashboard") }}
+          </a>
+        {% else %}
+          <a href="{{ url_for('login') }}">
+            {{ Button("Login", variant="ghost") }}
+          </a>
+          <a href="{{ url_for('sign_up') }}">
+            {{ Button("Sign up") }}
+          </a>
+        {% endif %}
       </div>
     </div>
   </nav>
@@ -42,12 +48,21 @@
       study room in seconds.
     </p>
     <div class="flex gap-3 justify-center flex-wrap">
-      <a href="{{ url_for('login') }}">
-        {{ Button("Book a Seat", variant="primary", size="lg") }}
-      </a>
-      <a href="{{ url_for('login') }}">
-        {{ Button("View Seat Map", variant="outline", size="lg") }}
-      </a>
+      {% if current_user %}
+        <a href="{{ url_for('seat_map') }}">
+          {{ Button("Book a Seat", variant="primary", size="lg") }}
+        </a>
+        <a href="{{ url_for('user_dashboard') }}">
+          {{ Button("My Dashboard", variant="outline", size="lg") }}
+        </a>
+      {% else %}
+        <a href="{{ url_for('login') }}">
+          {{ Button("Book a Seat", variant="primary", size="lg") }}
+        </a>
+        <a href="{{ url_for('login') }}">
+          {{ Button("View Seat Map", variant="outline", size="lg") }}
+        </a>
+      {% endif %}
     </div>
   </section>
 

@@ -1,5 +1,5 @@
 """
-main.py — Flask application entry point for the Library Seat Saving System.
+main.py — entry point for the Library Seat Saving System.
 
 Handles:
     - User authentication (login, sign-up, logout)
@@ -8,10 +8,10 @@ Handles:
     - Page routing for dashboard, seat map, bookings, admin pages
 """
 
+import os
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
-import secrets
 
 from forms import LoginForm, SignUpForm
 from flask_wtf import CSRFProtect
@@ -19,8 +19,9 @@ from db import get_db, close_db, query_db, init_db
 
 app = Flask(__name__)
 
-# Secret key for session cookies and CSRF protection
-app.secret_key = secrets.token_urlsafe(32)
+# Secret key for session cookies and CSRF protection.
+# Set SECRET_KEY in your environment for production; the fallback is dev-only.
+app.secret_key = os.environ.get('SECRET_KEY', 'nsysu-library-dev-key-change-in-production')
 
 # CSRF protection for all forms
 csrf = CSRFProtect(app)
@@ -36,21 +37,37 @@ app.teardown_appcontext(close_db)
 def login_required(f):
     """
     Decorator to protect routes that require authentication.
-    
-    If the user is not logged in (no 'user_id' in session),
-    they are redirected to the login page.
-    
-    Usage:
-        @app.route('/dashboard')
-        @login_required
-        def dashboard():
-            ...
+
+    Three checks in order:
+      1. Session must contain 'user_id' (i.e. the user went through login).
+      2. The user_id must resolve to a real row in the database — guards
+         against stale cookies left over after a DB reset or user deletion.
+      3. The account must not be suspended.
+
+    Any failure clears the session and redirects to the login page.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('login'))
+
+        user = query_db(
+            'SELECT uId, ustatus FROM users WHERE uId = ?',
+            (session['user_id'],),
+            one=True
+        )
+        if not user:
+            # Stale session — the user no longer exists in the database.
+            session.clear()
+            flash('Your session has expired. Please log in again.', 'warning')
+            return redirect(url_for('login'))
+
+        if user['ustatus'] == 'suspended':
+            session.clear()
+            flash('Your account has been suspended. Please contact the library staff.', 'error')
+            return redirect(url_for('login'))
+
         return f(*args, **kwargs)
     return decorated_function
 
@@ -235,11 +252,44 @@ def user_dashboard():
     return render_template("dashboard/user-dashboard.html")
 
 
+def _get_zones_with_seats():
+    """
+    Build a list of zone dicts, each containing its seats.
+
+    Returns a list of dicts with keys:
+        zoneId, name, location, zone_status,
+        seats       — list of seat dicts (seatId, destNo, status)
+        total       — total seat count in the zone
+        available   — count of seats with status='available'
+
+    Used by both seat_map and admin_dashboard so the query lives here once.
+    """
+    zones = query_db('SELECT * FROM zones ORDER BY zoneId')
+    result = []
+    for zone in zones:
+        seats = query_db(
+            'SELECT seatId, destNo, status FROM seats WHERE zoneId = ? ORDER BY destNo',
+            (zone['zoneId'],)
+        )
+        seat_list = [dict(s) for s in seats]
+        result.append({
+            'zoneId':      zone['zoneId'],
+            'name':        zone['name'],
+            'location':    zone['location'],
+            'zone_status': zone['status'],
+            'seats':       seat_list,
+            'total':       len(seat_list),
+            'available':   sum(1 for s in seat_list if s['status'] == 'available'),
+        })
+    return result
+
+
 @app.route("/seat-map")
 @login_required
 def seat_map():
     """Seat map page — interactive floor plan for booking seats."""
-    return render_template("dashboard/seat-map.html")
+    zones = _get_zones_with_seats()
+    return render_template("dashboard/seat-map.html", zones=zones)
 
 
 @app.route("/my-bookings")
@@ -257,7 +307,24 @@ def my_bookings():
 @admin_required
 def admin_dashboard():
     """Admin dashboard — manage bookings and seats."""
-    return render_template("dashboard/admin-dashboard.html")
+    zones = _get_zones_with_seats()
+
+    # Aggregate seat stats across all zones in one query.
+    stats = query_db(
+        '''SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN status = "maintenance" THEN 1 ELSE 0 END) AS blocked
+           FROM seats''',
+        one=True
+    )
+    total_seats  = stats['total']   or 0
+    blocked_seats = stats['blocked'] or 0
+
+    return render_template(
+        "dashboard/admin-dashboard.html",
+        zones=zones,
+        total_seats=total_seats,
+        blocked_seats=blocked_seats,
+    )
 
 
 @app.route("/manage-users")

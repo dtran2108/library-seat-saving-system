@@ -1,0 +1,151 @@
+{#
+  toast.html — shadcn/ui-inspired Toast notification component.
+
+  Renders Flask flash messages as toast notifications in the bottom-right corner.
+  Supports four variants that map to Flask flash categories:
+
+    flash("Message", "success")  → green left-border, check-circle icon
+    flash("Message", "error")    → red left-border,   x-circle icon
+    flash("Message", "warning")  → yellow left-border, alert-triangle icon
+    flash("Message", "info")     → primary left-border, info icon  (default)
+
+  Usage (already wired in layout.html — nothing extra needed in page templates):
+    {% from "components/ui/toast.html" import ToastContainer %}
+    {{ ToastContainer() }}
+
+  Triggering a toast from Python:
+    flash("Account created successfully! Please log in.", "success")
+#}
+
+{% macro ToastContainer() %}
+{% with messages = get_flashed_messages(with_categories=True) %}
+{% if messages %}
+
+{# ── Container ─────────────────────────────────────────────────────────── #}
+{# fixed bottom-right, toasts stack upward via flex-col-reverse             #}
+<div
+  id="toast-container"
+  role="region"
+  aria-label="Notifications"
+  class="fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2
+         w-[22rem] max-w-[calc(100vw-2rem)] pointer-events-none"
+>
+
+  {% for category, message in messages %}
+
+  {# ── Per-variant styles ──────────────────────────────────────────────── #}
+  {% if category == 'success' %}
+    {% set accent_border = 'border-l-available' %}
+    {% set icon_color    = 'text-available' %}
+  {% elif category == 'error' %}
+    {% set accent_border = 'border-l-destructive' %}
+    {% set icon_color    = 'text-destructive' %}
+  {% elif category == 'warning' %}
+    {% set accent_border = 'border-l-yellow-500' %}
+    {% set icon_color    = 'text-yellow-500' %}
+  {% else %}
+    {% set accent_border = 'border-l-primary' %}
+    {% set icon_color    = 'text-primary' %}
+  {% endif %}
+
+  {# ── Toast card ──────────────────────────────────────────────────────── #}
+  {# Starts invisible (opacity-0 translate-y-2); JS removes those classes   #}
+  <div
+    data-toast
+    role="alert"
+    aria-live="assertive"
+    class="pointer-events-auto relative flex w-full items-start gap-3
+           rounded-lg border border-border border-l-4 {{ accent_border }}
+           bg-card p-4 shadow-lg
+           opacity-0 translate-y-2 transition-all duration-300 ease-out"
+  >
+
+    {# ── Icon ──────────────────────────────────────────────────────────── #}
+    <div class="mt-0.5 shrink-0 {{ icon_color }}">
+      {% if category == 'success' %}
+        {# check-circle #}
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <path d="m9 11 3 3L22 4"/>
+        </svg>
+      {% elif category == 'error' %}
+        {# x-circle #}
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="m15 9-6 6"/><path d="m9 9 6 6"/>
+        </svg>
+      {% elif category == 'warning' %}
+        {# alert-triangle #}
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+          <path d="M12 9v4"/><path d="M12 17h.01"/>
+        </svg>
+      {% else %}
+        {# info #}
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4"/><path d="M12 8h.01"/>
+        </svg>
+      {% endif %}
+    </div>
+
+    {# ── Message text ──────────────────────────────────────────────────── #}
+    <p class="flex-1 text-sm leading-5 text-foreground">{{ message }}</p>
+
+    {# ── Dismiss button ────────────────────────────────────────────────── #}
+    <button
+      onclick="dismissToast(this.closest('[data-toast]'))"
+      aria-label="Dismiss notification"
+      class="-mr-1 -mt-0.5 shrink-0 rounded-md p-1
+             text-muted-foreground transition-colors
+             hover:bg-secondary hover:text-foreground"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+           viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+      </svg>
+    </button>
+
+  </div>
+  {% endfor %}
+
+</div>
+
+{# ── Toast JavaScript ──────────────────────────────────────────────────── #}
+<script>
+  /** Slide a toast out and remove it from the DOM. */
+  function dismissToast(el) {
+    if (!el) return;
+    el.classList.add('opacity-0', 'translate-y-2');
+    el.addEventListener('transitionend', function () { el.remove(); }, { once: true });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var toasts = document.querySelectorAll('[data-toast]');
+
+    toasts.forEach(function (toast, i) {
+      // Staggered slide-in: each toast appears 80 ms after the previous one.
+      setTimeout(function () {
+        toast.classList.remove('opacity-0', 'translate-y-2');
+      }, 60 + i * 80);
+
+      // Auto-dismiss after 4.5 s (+ stagger offset so they don't all vanish at once).
+      setTimeout(function () {
+        dismissToast(toast);
+      }, 4500 + i * 80);
+    });
+  });
+</script>
+
+{% endif %}
+{% endwith %}
+{% endmacro %}

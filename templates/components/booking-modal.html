@@ -33,7 +33,7 @@
     </div>
 
     <form action="#" method="POST">
-        <input type="hidden" name="seat_number" id="{{ id }}-seat-input" value="" />
+        <input type="hidden" name="seat_id" id="{{ id }}-seat-input" value="" />
         <input type="hidden" name="booking_date" value="{{ date }}" />
         <input type="hidden" name="start_time" id="{{ id }}-start-input" value="" />
         <input type="hidden" name="duration" id="{{ id }}-duration-input" value="1" />
@@ -148,18 +148,20 @@
         };
 
         // ── Public opener ──
-        window.openBookingModal = function(seatNumber) {
+        // seatId    — integer PK posted to the booking route
+        // seatLabel — display string, e.g. "Learning Plaza A · A-04"
+        window.openBookingModal = function(seatId, seatLabel) {
             // Reset state
             selectedSlot = '';
             selectedDuration = 1;
 
             // Reset hidden inputs
-            document.getElementById(modalId + '-seat-input').value = seatNumber;
+            document.getElementById(modalId + '-seat-input').value = seatId;
             document.getElementById(modalId + '-start-input').value = '';
             document.getElementById(modalId + '-duration-input').value = '1';
 
             // Reset UI
-            document.getElementById(modalId + '-seat-name').textContent = 'Seat ' + seatNumber;
+            document.getElementById(modalId + '-seat-name').textContent = seatLabel || 'Seat ' + seatId;
             document.getElementById(modalId + '-summary').classList.add('hidden');
 
             // Reset duration buttons

@@ -8,90 +8,103 @@
 
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto">
-    {{ PageHeader("Seat Map", "Select a date and click an available seat to book.", icon="map") }}
+    {{ PageHeader("Seat Map", "Select a date, then click an available seat to book.", icon="map") }}
 
     <!-- Date picker -->
     {{ DatePicker(value="2026-05-10", wrapper_class="mb-6") }}
 
     <!-- Legend -->
-    <div class="flex gap-4 mb-5 flex-wrap">
+    <div class="flex gap-4 mb-6 flex-wrap">
         <div class="flex items-center gap-1.5">
-            <div class="w-5 h-5 rounded border bg-green-100 border-green-300 flex items-center justify-center text-xs"></div>
+            <div class="w-5 h-5 rounded border-2 bg-green-50 border-green-300"></div>
             <span class="text-xs text-muted-foreground">Available</span>
         </div>
         <div class="flex items-center gap-1.5">
-            <div class="w-5 h-5 rounded border bg-red-100 border-red-300 flex items-center justify-center text-xs"></div>
+            <div class="w-5 h-5 rounded border-2 bg-red-50 border-red-300"></div>
             <span class="text-xs text-muted-foreground">Booked</span>
         </div>
         <div class="flex items-center gap-1.5">
-            <div class="w-5 h-5 rounded border bg-gray-100 border-gray-300 flex items-center justify-center text-xs"></div>
+            <div class="w-5 h-5 rounded border-2 bg-gray-50 border-gray-300"></div>
             <span class="text-xs text-muted-foreground">Blocked</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-            <div class="w-5 h-5 rounded border bg-primary/20 border-primary flex items-center justify-center text-xs"></div>
-            <span class="text-xs text-muted-foreground">Your Booking</span>
         </div>
     </div>
 
-    <!-- SeatGrid -->
-    <div class="bg-card border border-border rounded-2xl p-6 overflow-x-auto mt-6">
-        <div class="flex justify-center mb-8">
-            <div class="px-8 py-2 border-2 border-dashed border-muted-foreground/30 rounded-xl text-sm font-medium text-muted-foreground tracking-widest uppercase">
-                Entrance / Exit
-            </div>
+    {# ── Zone Sections ──────────────────────────────────────────────── #}
+    {% if not zones %}
+        <div class="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">
+            No zones are configured yet.
         </div>
+    {% else %}
+        <div class="flex flex-col gap-4">
+        {% for zone in zones %}
+            <div class="bg-card border border-border rounded-2xl p-6">
 
-        <div class="flex flex-col gap-4 items-center">
-            {% for row in ['A', 'B', 'C', 'D', 'E'] %}
-                <div class="flex items-center gap-4">
-                    <span class="text-sm font-bold text-muted-foreground w-6 text-right">{{ row }}</span>
-                    <div class="flex gap-3 flex-wrap">
-                        {% for col in range(1, 9) %}
-                            {# Determine seat status for mock data #}
-                            {% set seat_status = 'available' %}
-                            {% if loop.index == 2 and row == 'A' %}
-                                {% set seat_status = 'booked' %}
-                            {% elif loop.index == 4 and row == 'B' %}
-                                {% set seat_status = 'blocked' %}
-                            {% elif loop.index == 6 and row == 'C' %}
-                                {% set seat_status = 'yours' %}
-                            {% elif loop.index == 5 and row == 'D' %}
-                                {% set seat_status = 'booked' %}
-                            {% endif %}
+                {# Zone header: name + location + availability pill #}
+                <div class="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="font-semibold text-foreground">{{ zone.name }}</h3>
+                        <p class="text-xs text-muted-foreground mt-0.5">{{ zone.location }}</p>
+                    </div>
+                    {% if zone.zone_status == 'maintenance' %}
+                        <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                            Closed for maintenance
+                        </span>
+                    {% elif zone.available == 0 %}
+                        <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-700">
+                            Full — 0 / {{ zone.total }}
+                        </span>
+                    {% else %}
+                        <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                            {{ zone.available }} / {{ zone.total }} available
+                        </span>
+                    {% endif %}
+                </div>
 
-                            {# Map status → CSS classes #}
-                            {% if seat_status == 'booked' %}
-                                {% set status_class = "bg-red-50 border-red-300 text-red-700 cursor-not-allowed opacity-70" %}
-                            {% elif seat_status == 'blocked' %}
-                                {% set status_class = "bg-gray-50 border-gray-300 text-gray-400 cursor-not-allowed opacity-70" %}
-                            {% elif seat_status == 'yours' %}
-                                {% set status_class = "bg-primary/20 border-primary text-primary hover:scale-105 cursor-pointer" %}
+                {# Whole zone blocked #}
+                {% if zone.zone_status == 'maintenance' %}
+                    <p class="text-sm text-muted-foreground text-center py-4">
+                        This area is temporarily unavailable.
+                    </p>
+
+                {# Individual seats #}
+                {% else %}
+                    <div class="flex flex-wrap gap-2">
+                        {% for seat in zone.seats %}
+                            {# Map DB status → visual style #}
+                            {% if seat.status == 'booked' %}
+                                {% set cls = "bg-red-50 border-red-300 text-red-700 cursor-not-allowed opacity-70" %}
+                            {% elif seat.status == 'maintenance' %}
+                                {% set cls = "bg-gray-50 border-gray-300 text-gray-400 cursor-not-allowed opacity-60" %}
                             {% else %}
-                                {% set status_class = "bg-green-50 border-green-300 text-green-700 hover:scale-105 cursor-pointer" %}
+                                {% set cls = "bg-green-50 border-green-300 text-green-700 hover:scale-105 hover:shadow-sm cursor-pointer" %}
                             {% endif %}
 
-                            {% set seat_number = row ~ col %}
+                            {# Label shown inside the seat button and inside the modal #}
+                            {% set seat_label = zone.name ~ ' · ' ~ seat.destNo %}
 
                             <button
                                 type="button"
-                                class="w-12 h-12 rounded-xl border-2 text-sm font-semibold transition-all duration-150 {{ status_class }}"
-                                {% if seat_status in ['available', 'yours'] %}
-                                    onclick="openBookingModal('{{ seat_number }}')"
+                                class="w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 {{ cls }}"
+                                title="{{ seat_label }}"
+                                {% if seat.status == 'available' %}
+                                    onclick="openBookingModal({{ seat.seatId }}, {{ seat_label | tojson }})"
                                 {% else %}
                                     disabled
                                 {% endif %}
                             >
-                                {{ seat_number }}
+                                {{ seat.destNo }}
                             </button>
                         {% endfor %}
                     </div>
-                </div>
-            {% endfor %}
+                {% endif %}
+
+            </div>
+        {% endfor %}
         </div>
-    </div>
+    {% endif %}
 </div>
 
-{# Render the BookingModal (hidden by default, opened via JS) #}
+{# Booking modal — opened via openBookingModal(seatId, seatLabel) in JS #}
 {{ BookingModal(date="May 10, 2026") }}
 
 {% endblock %}
