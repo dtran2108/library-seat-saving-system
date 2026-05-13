@@ -8,49 +8,6 @@ A web application where students log in with their student ID, browse a live flo
 
 ---
 
-## Table of Contents
-
-- [Library Seat Saving System](#library-seat-saving-system)
-  - [Table of Contents](#table-of-contents)
-  - [1. Task Checklist](#1-task-checklist)
-    - [Infrastructure](#infrastructure)
-    - [Authentication (Students \& Admins)](#authentication-students--admins)
-    - [Student — Seat Discovery \& Booking](#student--seat-discovery--booking)
-    - [Student — Booking Management](#student--booking-management)
-    - [Student — Other](#student--other)
-    - [Admin — Seat \& Zone Management](#admin--seat--zone-management)
-    - [Admin — User Management](#admin--user-management)
-    - [System Functions](#system-functions)
-  - [2. Project Overview](#2-project-overview)
-    - [The frontend / backend split](#the-frontend--backend-split)
-  - [3. Repository Structure](#3-repository-structure)
-  - [4. Development Guide](#4-development-guide)
-    - [Prerequisites](#prerequisites)
-    - [First-Time Setup — Backend](#first-time-setup--backend)
-    - [First-Time Setup — Frontend](#first-time-setup--frontend)
-    - [Daily Development](#daily-development)
-  - [4. Database Guide](#4-database-guide)
-    - [How the database is created](#how-the-database-is-created)
-    - [Starter data](#starter-data)
-    - [Creating an admin account](#creating-an-admin-account)
-    - [Resetting the database](#resetting-the-database)
-  - [5. Contributor Workflow](#5-contributor-workflow)
-    - [Backend workflow](#backend-workflow)
-    - [Frontend workflow](#frontend-workflow)
-  - [6. Adding New Features](#6-adding-new-features)
-    - [New page](#new-page)
-    - [New form](#new-form)
-    - [New database table](#new-database-table)
-  - [7. Must-Know Concepts](#7-must-know-concepts)
-    - [The three-layer architecture](#the-three-layer-architecture)
-    - [Why we split routes from controllers](#why-we-split-routes-from-controllers)
-    - [How authentication and access control work](#how-authentication-and-access-control-work)
-    - [How page templates work](#how-page-templates-work)
-    - [How forms are protected](#how-forms-are-protected)
-    - [How data is read from and written to the database](#how-data-is-read-from-and-written-to-the-database)
-
----
-
 ## 1. Task Checklist
 
 A living record of what is done and what still needs to be built. Update this as features land. Items marked `[x]` are fully functional end-to-end; items marked `[ ]` are either not started or exist only as a UI shell with no backend logic yet.
@@ -211,13 +168,12 @@ library-seat-saving-system/
 
 ### Prerequisites
 
-You need three tools installed. Run the "Check with" command in your terminal to see if you already have each one.
+Verify you have the necessary environment tools installed:
 
 | Tool | Required version | Check with |
 |------|-----------------|------------|
-| Python | 3.10 or newer | `python3 --version` |
-| Node.js | 18 or newer | `node --version` |
-| npm | comes with Node | `npm --version` |
+| Python | 3.10+ | `python3 --version` |
+| Node.js | 22+ | `node --version` |
 
 If a command is not found, download the tool from its official website, install it, then check again.
 
@@ -290,7 +246,7 @@ Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. The databas
 
 Open a **second terminal** for this — keep the Flask server running in the first one.
 
-**Step 1 — Install Node packages**
+**Step 1: Install Node packages**
 
 ```bash
 cd frontend
@@ -299,7 +255,7 @@ npm install
 
 This reads `frontend/package.json` and installs the Tailwind CSS compiler. It creates a `node_modules/` folder — that folder is large and is excluded from git, so you must run this after every fresh clone.
 
-**Step 2 — Build the CSS**
+**Step 2: Build the CSS**
 
 ```bash
 # Still inside frontend/
@@ -314,7 +270,7 @@ This compiles `input.css` into `output.css`. The browser loads `output.css`. Nev
 
 Every time you sit down to work, you need **two terminals** running simultaneously.
 
-**Terminal 1 — CSS watcher** (from `frontend/`)
+**Terminal 1: CSS watcher** (from `frontend/`)
 
 ```bash
 source ../<your_environment_name>/bin/activate      # macOS/Linux — skip if already active
@@ -323,7 +279,7 @@ npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watc
 
 Leave this running. It automatically rebuilds the CSS whenever you save a template file.
 
-**Terminal 2 — Flask server** (from `backend/`)
+**Terminal 2: Flask server** (from `backend/`)
 
 ```bash
 source ../<your_environment_name>/bin/activate      # macOS/Linux — skip if already active
@@ -334,7 +290,7 @@ Leave this running too. The `--debug` flag auto-restarts the server whenever you
 
 ---
 
-## 4. Database Guide
+## 5. Database Operations
 
 ### How the database is created
 
@@ -379,7 +335,7 @@ cd backend && flask --app main run --debug
 
 ---
 
-## 5. Contributor Workflow
+## 6. Contributor Workflow
 
 This section is a step-by-step guide for adding any new feature to the project.
 
@@ -561,7 +517,7 @@ The template uses `bookings` because that is what `render_template` received. Th
 
 ---
 
-## 6. Adding New Features
+## 7. Adding New Features
 
 ### New page
 
@@ -621,7 +577,7 @@ set nav_items = [
 
 ---
 
-## 7. Must-Know Concepts
+## 8. Must-Know Concepts
 
 You don't need to memorise all of this before touching the code. But reading it once will save you a lot of confusion when something breaks or when you need to add a feature.
 

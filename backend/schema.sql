@@ -141,10 +141,9 @@ END;
 --   Computer:  3 cols → 2 rows × 3 seats
 --   Quiet:     4 cols → 1 row  × 4 seats
 INSERT OR IGNORE INTO zones (zoneId, name, location, cols, status) VALUES
-    (1, 'Learning Plaza A', '2nd Floor, North Wing', 4, 'active'),
-    (2, 'Learning Plaza B', '2nd Floor, South Wing', 4, 'active'),
-    (3, 'Computer Area',    '3rd Floor',             3, 'active'),
-    (4, 'Quiet Study Room', '3rd Floor',             4, 'active');
+    (1, 'Learning Plaza A', '1st Floor', 4, 'active'),
+    (2, 'Learning Plaza B', '1st Floor', 4, 'active'),
+    (3, 'Computer Area',    '4th Floor',             3, 'active'),
 
 -- Learning Plaza A — 8 seats
 INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES
@@ -176,10 +175,3 @@ INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES
     (20, 3, 'C-04', 'available'),
     (21, 3, 'C-05', 'maintenance'),
     (22, 3, 'C-06', 'available');
-
--- Quiet Study Room — 4 seats
-INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES
-    (23, 4, 'Q-01', 'available'),
-    (24, 4, 'Q-02', 'available'),
-    (25, 4, 'Q-03', 'available'),
-    (26, 4, 'Q-04', 'available');
