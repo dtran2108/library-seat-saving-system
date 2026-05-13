@@ -5,15 +5,15 @@
 {# ── Shared Nav Data ── #}
 {%
     set nav_items = [
-        {'endpoint': 'user_dashboard', 'label': 'Dashboard', 'icon': 'layout-dashboard'},
-        {'endpoint': 'seat_map', 'label': 'Seat Map', 'icon': 'map'},
-        {'endpoint': 'my_bookings', 'label': 'My Bookings', 'icon': 'calendar-check'}
+        {'endpoint': 'seats.user_dashboard', 'label': 'Dashboard', 'icon': 'layout-dashboard'},
+        {'endpoint': 'seats.seat_map', 'label': 'Seat Map', 'icon': 'map'},
+        {'endpoint': 'seats.my_bookings', 'label': 'My Bookings', 'icon': 'calendar-check'}
     ]
 %}
 {%
     set admin_items = [
-        {'endpoint': 'admin_dashboard', 'label': 'Admin Panel', 'icon': 'settings'},
-        {'endpoint': 'manage_users', 'label': 'Manage Users', 'icon': 'users'}
+        {'endpoint': 'admin.admin_dashboard', 'label': 'Admin Panel', 'icon': 'settings'},
+        {'endpoint': 'admin.manage_users', 'label': 'Manage Users', 'icon': 'users'}
     ]
 %}
 
@@ -191,7 +191,7 @@
             title="Log out?",
             description="Are you sure you want to log out?",
             confirm_label="Log out",
-            confirm_href=url_for('logout'),
+            confirm_href=url_for('auth.logout'),
             cancel_label="Cancel"
         ) }}
 

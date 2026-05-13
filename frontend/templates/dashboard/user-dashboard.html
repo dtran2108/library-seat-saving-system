@@ -29,7 +29,7 @@
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-            <a href="{{ url_for('seat_map') }}">
+            <a href="{{ url_for('seats.seat_map') }}">
                 <div class="bg-primary text-primary-foreground rounded-2xl p-5 hover:bg-primary/90 transition-colors cursor-pointer">
                     {{ Icon('map', class="w-6 h-6 mb-3 opacity-80") }}
                     <h3 class="font-semibold text-lg">Book a Seat</h3>
@@ -39,7 +39,7 @@
                     </div>
                 </div>
             </a>
-            <a href="{{ url_for('my_bookings') }}">
+            <a href="{{ url_for('seats.my_bookings') }}">
                 <div class="bg-card border border-border rounded-2xl p-5 hover:shadow-md transition-shadow cursor-pointer">
                     {{ Icon('calendar-check', class="w-6 h-6 mb-3 text-primary") }}
                     <h3 class="font-semibold text-lg text-foreground">My Bookings</h3>
@@ -59,7 +59,7 @@
                 <div class="bg-card border border-border rounded-2xl p-8 text-center">
                     {{ Icon('clock', class="w-8 h-8 text-muted-foreground mx-auto mb-2") }}
                     <p class="text-muted-foreground">No upcoming bookings.</p>
-                    <a href="{{ url_for('seat_map') }}" class="inline-block mt-4">
+                    <a href="{{ url_for('seats.seat_map') }}" class="inline-block mt-4">
                         {{ Button("Book a seat now", size="sm") }}
                     </a>
                 </div>
@@ -77,7 +77,7 @@
                         </div>
                     {% endfor %}
 
-                    <a href="{{ url_for('my_bookings') }}" class="text-sm text-primary font-medium hover:underline mt-1">
+                    <a href="{{ url_for('seats.my_bookings') }}" class="text-sm text-primary font-medium hover:underline mt-1">
                         View all bookings →
                     </a>
                 </div>

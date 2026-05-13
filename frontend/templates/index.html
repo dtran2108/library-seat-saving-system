@@ -14,14 +14,14 @@
       >
       <div class="flex gap-2">
         {% if current_user %}
-          <a href="{{ url_for('admin_dashboard') if current_user['role'] == 'admin' else url_for('user_dashboard') }}">
+          <a href="{{ url_for('admin.admin_dashboard') if current_user['role'] == 'admin' else url_for('seats.user_dashboard') }}">
             {{ Button("Go to Dashboard") }}
           </a>
         {% else %}
-          <a href="{{ url_for('login') }}">
+          <a href="{{ url_for('auth.login') }}">
             {{ Button("Login", variant="ghost") }}
           </a>
-          <a href="{{ url_for('sign_up') }}">
+          <a href="{{ url_for('auth.sign_up') }}">
             {{ Button("Sign up") }}
           </a>
         {% endif %}
@@ -49,17 +49,17 @@
     </p>
     <div class="flex gap-3 justify-center flex-wrap">
       {% if current_user %}
-        <a href="{{ url_for('seat_map') }}">
+        <a href="{{ url_for('seats.seat_map') }}">
           {{ Button("Book a Seat", variant="primary", size="lg") }}
         </a>
-        <a href="{{ url_for('user_dashboard') }}">
+        <a href="{{ url_for('seats.user_dashboard') }}">
           {{ Button("My Dashboard", variant="outline", size="lg") }}
         </a>
       {% else %}
-        <a href="{{ url_for('login') }}">
+        <a href="{{ url_for('auth.login') }}">
           {{ Button("Book a Seat", variant="primary", size="lg") }}
         </a>
-        <a href="{{ url_for('login') }}">
+        <a href="{{ url_for('auth.login') }}">
           {{ Button("View Seat Map", variant="outline", size="lg") }}
         </a>
       {% endif %}
