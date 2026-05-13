@@ -1,6 +1,6 @@
 # Library Seat Saving System
 
-**NSYSU MIS205 — Group 6**
+**NSYSU MIS205 (Group 6)**
 
 A web application where students log in with their student ID, browse a live floor-plan seat map, and reserve a library seat. Admins get a separate dashboard to manage zones, seats, and users.
 
