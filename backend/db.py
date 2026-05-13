@@ -47,11 +47,12 @@ def query_db(query, args=(), one=False):
 def init_db():
     db = get_db()
     # current_app.root_path is the directory where main.py lives (backend/),
-    # so this always finds schema.sql regardless of where you run flask from.
-    schema_path = os.path.join(current_app.root_path, 'schema.sql')
-    with open(schema_path, 'r') as f:
-        db.executescript(f.read())
-    db.commit()
+    # so these paths are correct regardless of where you run flask from.
+    # schema.sql must run first — seed.sql depends on the tables existing.
+    for filename in ('schema.sql', 'seed.sql'):
+        path = os.path.join(current_app.root_path, filename)
+        with open(path) as f:
+            db.executescript(f.read())
 
 
 def get_zones_with_seats():

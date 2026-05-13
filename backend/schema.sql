@@ -1,12 +1,11 @@
--- schema.sql — Database schema for the Library Seat Saving System.
+-- schema.sql — DDL for the Library Seat Saving System.
 --
--- Tables are derived from the ER model (ER-models.png) with one
--- normalization: Seat's flat location/zone TEXT columns are extracted
--- into a proper `zones` table.  Each zone represents a named physical
--- area (e.g. a learning plaza); seats belong to exactly one zone.
---
--- Run via init_db() in db.py (uses IF NOT EXISTS — safe to re-run).
--- Seed data uses INSERT OR IGNORE with explicit PKs — idempotent.
+-- Contains only structure: CREATE TABLE and CREATE TRIGGER statements.
+-- Seed data lives in seed.sql.
+-- Both files are executed by init_db() in db.py on every server start.
+-- IF NOT EXISTS / DROP-free DDL makes this safe to re-run on an existing DB.
+
+PRAGMA foreign_keys = ON;
 
 -- ─────────────────────────────────────────────────────────────
 -- User
@@ -39,7 +38,6 @@ CREATE TABLE IF NOT EXISTS zones (
 -- ─────────────────────────────────────────────────────────────
 -- Seat
 -- Attributes: seatId (PK), zoneId (FK→zones), destNo, status
--- Removed: location TEXT, zone TEXT  (now in zones table)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS seats (
     seatId INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,7 +113,8 @@ CREATE TABLE IF NOT EXISTS admin_action_logs (
 
 -- ─────────────────────────────────────────────────────────────
 -- Trigger: auto-release seat on no-show
--- (Implements the "Auto-Release Seats" system requirement.)
+-- Fires when a check_in_log row is updated to status = 'no_show'.
+-- Marks the linked reservation no_show and frees the seat.
 -- ─────────────────────────────────────────────────────────────
 CREATE TRIGGER IF NOT EXISTS auto_release_seat
 AFTER UPDATE OF status ON check_in_logs
@@ -129,49 +128,3 @@ BEGIN
     SET    status = 'available'
     WHERE  seatId = (SELECT seatId FROM reservations WHERE reservationId = NEW.reservationId);
 END;
-
--- ─────────────────────────────────────────────────────────────
--- Seed Data — zones and seats
---
--- INSERT OR IGNORE with explicit PKs makes this block idempotent:
--- on the first run it inserts; on subsequent startups it is a no-op.
--- ─────────────────────────────────────────────────────────────
--- cols = seats per row in the physical grid layout
---   Plaza A/B: 4 cols → 2 rows × 4 seats
---   Computer:  3 cols → 2 rows × 3 seats
---   Quiet:     4 cols → 1 row  × 4 seats
-INSERT OR IGNORE INTO zones (zoneId, name, location, cols, status) VALUES
-    (1, 'Learning Plaza A', '1st Floor', 4, 'active'),
-    (2, 'Learning Plaza B', '1st Floor', 4, 'active'),
-    (3, 'Computer Area',    '4th Floor',             3, 'active'),
-
--- Learning Plaza A — 8 seats
-INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES
-    ( 1, 1, 'A-01', 'available'),
-    ( 2, 1, 'A-02', 'available'),
-    ( 3, 1, 'A-03', 'available'),
-    ( 4, 1, 'A-04', 'booked'),
-    ( 5, 1, 'A-05', 'available'),
-    ( 6, 1, 'A-06', 'available'),
-    ( 7, 1, 'A-07', 'maintenance'),
-    ( 8, 1, 'A-08', 'available');
-
--- Learning Plaza B — 8 seats
-INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES
-    ( 9, 2, 'B-01', 'available'),
-    (10, 2, 'B-02', 'available'),
-    (11, 2, 'B-03', 'booked'),
-    (12, 2, 'B-04', 'available'),
-    (13, 2, 'B-05', 'available'),
-    (14, 2, 'B-06', 'available'),
-    (15, 2, 'B-07', 'available'),
-    (16, 2, 'B-08', 'booked');
-
--- Computer Area — 6 seats
-INSERT OR IGNORE INTO seats (seatId, zoneId, destNo, status) VALUES
-    (17, 3, 'C-01', 'available'),
-    (18, 3, 'C-02', 'available'),
-    (19, 3, 'C-03', 'booked'),
-    (20, 3, 'C-04', 'available'),
-    (21, 3, 'C-05', 'maintenance'),
-    (22, 3, 'C-06', 'available');
