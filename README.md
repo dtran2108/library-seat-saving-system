@@ -21,8 +21,7 @@ A living record of what is done and what still needs to be built. Update this as
 - [x] CSRF protection and session-based authentication
 - [x] Auth guards (`@login_required`, `@admin_required`) in `decorators.py`
 - [x] SQLite schema with all seven tables: `users`, `zones`, `seats`, `reservations`, `check_in_logs`, `penalties`, `admin_action_logs`
-- [x] Database auto-initialized from `schema.sql` on first server start
-- [x] Seed data — 4 zones, 26 seats pre-loaded via `INSERT OR IGNORE`
+- [x] Database auto-initialized from `schema.sql` + `seed.sql` on first server start
 - [x] Auto-release database trigger — marks reservations `no_show` and frees the seat if the student does not check in within 30 minutes
 
 ---
@@ -123,7 +122,8 @@ library-seat-saving-system/
 │   ├── db.py                  ← Database connection and low-level query helpers
 │   ├── decorators.py          ← @login_required and @admin_required guards
 │   ├── config.py              ← App settings (secret key, database path)
-│   ├── schema.sql             ← Defines all database tables and inserts starter data
+│   ├── schema.sql             ← DDL only: CREATE TABLE and CREATE TRIGGER statements
+│   ├── seed.sql               ← DML only
 │   ├── requirements.txt       ← Python packages this project needs
 │   ├── .env.example           ← Copy to .env and fill in your secret key
 │   │
@@ -294,13 +294,13 @@ Leave this running too. The `--debug` flag auto-restarts the server whenever you
 
 ### How the database is created
 
-The database file (`backend/library.db`) is created automatically when the server starts for the first time. You do not need to create it yourself. Flask calls `init_db()` at startup, which runs `backend/schema.sql` to create all tables.
+The database file (`backend/library.db`) is created automatically when the server starts for the first time. You do not need to create it yourself. Flask calls `init_db()` at startup, which runs `backend/schema.sql` then `backend/seed.sql` in that order.
 
 `schema.sql` uses `CREATE TABLE IF NOT EXISTS` everywhere, so it is safe to run on every startup — existing tables are left alone.
 
 ### Starter data
 
-`schema.sql` also pre-loads four zones (Learning Plaza A/B, Computer Area, Quiet Study Room) and 26 seats with `INSERT OR IGNORE`, so the seed data only inserts once and is never duplicated on restart.
+`seed.sql` pre-loads four zones (Learning Plaza A/B, Computer Area, Quiet Study Room) and 26 seats with `INSERT OR IGNORE`, so the seed data only inserts once and is never duplicated on restart.
 
 ### Creating an admin account
 
@@ -325,7 +325,7 @@ with app.app_context():
 
 ### Resetting the database
 
-Delete the database file and restart the server. It will be recreated from `schema.sql` with clean starter data.
+Delete the database file and restart the server. It will be recreated from `schema.sql` and `seed.sql` with clean starter data.
 
 ```bash
 # From the project root
@@ -570,7 +570,7 @@ set nav_items = [
 
 ### New database table
 
-1. Add `CREATE TABLE IF NOT EXISTS ...` to `backend/schema.sql`.
+1. Add `CREATE TABLE IF NOT EXISTS ...` to `backend/schema.sql` (DDL only).
 2. Add any starter rows with `INSERT OR IGNORE`.
 3. Delete `backend/library.db` and restart the server so the new table is created.
 4. Add query functions to `backend/controllers/` as needed.
@@ -627,7 +627,7 @@ Browser request
 |---|---|
 | Wrong page shown, redirect going nowhere | `routes/` |
 | Booking succeeds but wrong seat is updated | `controllers/` |
-| Database error, column not found | `db.py` or `schema.sql` |
+| Database error, column not found | `db.py`, `schema.sql`, or `seed.sql` |
 | Page looks wrong, missing data | `frontend/templates/` |
 
 ---
