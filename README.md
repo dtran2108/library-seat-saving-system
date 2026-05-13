@@ -25,8 +25,14 @@ A web application where students log in with their student ID, browse a live flo
    - [How page templates work](#how-page-templates-work)
    - [How forms are protected](#how-forms-are-protected)
    - [How data is read from and written to the database](#how-data-is-read-from-and-written-to-the-database)
-6. [Adding New Features](#6-adding-new-features)
-7. [Troubleshooting](#7-troubleshooting)
+6. [Contributor Workflow](#6-contributor-workflow)
+   - [The mental model: data → logic → delivery](#the-mental-model-data--logic--delivery)
+   - [Backend workflow](#backend-workflow)
+   - [Frontend workflow](#frontend-workflow)
+   - [The one rule you must not break](#the-one-rule-you-must-not-break)
+   - [Pre-PR checklist](#pre-pr-checklist)
+7. [Adding New Features](#7-adding-new-features)
+8. [Troubleshooting](#8-troubleshooting)
 
 ---
 
@@ -484,7 +490,243 @@ db.commit()   # without this, the change is not saved to disk
 
 ---
 
-## 6. Adding New Features
+## 6. Contributor Workflow
+
+This section is a step-by-step guide for adding any new feature to the project. It exists because the most common mistake newcomers make is putting too much code in the wrong place — specifically, writing business logic directly inside a route. Following this sequence every time prevents that.
+
+---
+
+### The mental model: data → logic → delivery
+
+Before you write a single line of code, think about your feature in three stages:
+
+```
+1. DATA      What does the database need to store or return?
+                └─▶ Write a function in backend/controllers/
+
+2. LOGIC     What rules apply? What can go wrong?
+                └─▶ Write the checks inside that same controller function
+
+3. DELIVERY  How does the browser ask for it, and what does it get back?
+                └─▶ Write a thin route in backend/routes/
+                └─▶ Write or update a template in frontend/templates/
+```
+
+A useful test for whether something belongs in a **controller**: can you read the function without knowing what Flask is? If it uses `request`, `render_template`, `session`, or `redirect`, it does not belong in a controller — those are delivery concerns.
+
+A useful test for whether something belongs in a **route**: is it doing anything other than reading the request, calling a controller, and returning a response? If yes, move that part to a controller.
+
+---
+
+### Backend workflow
+
+We will use a concrete example throughout: **cancelling a booking**. A student clicks "Cancel" on their booking, the reservation status changes to `'cancelled'`, and the seat is freed up.
+
+---
+
+**Step 1 — Write the controller function**
+
+Open (or create) the relevant file under `backend/controllers/` and write a function that contains all the logic. This function must not import anything from Flask.
+
+```python
+# backend/controllers/seats.py
+
+def cancel_booking(user_id, reservation_id):
+    """Cancel a reservation if it belongs to the requesting user.
+
+    Returns (True, success_msg) or (False, error_msg).
+    """
+    # Rule 1: does this reservation exist and belong to this user?
+    reservation = query_db(
+        'SELECT reservationId, seatId, status FROM reservations '
+        'WHERE reservationId = ? AND uId = ?',
+        (reservation_id, user_id),
+        one=True
+    )
+    if not reservation:
+        return False, 'Reservation not found.'
+
+    # Rule 2: can only cancel active reservations.
+    if reservation['status'] != 'active':
+        return False, 'Only active reservations can be cancelled.'
+
+    db = get_db()
+    db.execute(
+        "UPDATE reservations SET status = 'cancelled' WHERE reservationId = ?",
+        (reservation_id,)
+    )
+    db.execute(
+        "UPDATE seats SET status = 'available' WHERE seatId = ?",
+        (reservation['seatId'],)
+    )
+    db.commit()
+    return True, 'Booking cancelled successfully.'
+```
+
+Notice what this function does **not** do: it never touches `request`, `session`, `flash`, or `render_template`. It is pure logic that happens to use the database. You could call it from a test, a CLI script, or a scheduled job — not just an HTTP request.
+
+---
+
+**Step 2 — Register the route**
+
+Open the relevant file under `backend/routes/` and write a thin route that does exactly three things: read the request, call the controller, return the response.
+
+```python
+# backend/routes/seats.py
+
+@seats_bp.route('/api/cancel-booking', methods=['POST'])
+@login_required
+def cancel_booking_route():
+    reservation_id = request.form.get('reservation_id', '').strip()  # 1. read
+
+    success, message = cancel_booking(session['user_id'], reservation_id)  # 2. call
+
+    if success:                                                        # 3. respond
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message)
+```
+
+That is the entire route function. Three lines of real logic. If you find yourself writing `if`/`else` business rules or SQL queries inside a route, stop — those belong in the controller.
+
+> **Why import the controller function, not copy-paste the code?**
+> Because next month, the cancellation rule will change ("only cancel 30 minutes before start time"). You will change it in one place — `controllers/seats.py` — and every route that calls `cancel_booking()` gets the fix for free.
+
+---
+
+### Frontend workflow
+
+With the backend in place, here is how to build the UI that calls it.
+
+---
+
+**Step 3 — Check the component library before building anything new**
+
+Look inside `frontend/templates/components/ui/` before writing any HTML from scratch. The project already has macros for buttons, inputs, icons, and dialogs. Reusing them keeps the UI consistent and saves you time.
+
+```
+frontend/templates/components/ui/
+├── button.html        ← Button(label, variant, size)
+├── input.html         ← Input(field)
+├── icon.html          ← Icon(name, class)
+├── alert-dialog.html  ← AlertDialog(id, title, …)
+└── toast.html         ← ToastContainer()
+```
+
+Import a macro at the top of your template file before using it:
+
+```html
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/icon.html" import Icon %}
+```
+
+---
+
+**Step 4 — Create or update the template**
+
+Either create a new file in `frontend/templates/dashboard/` or add to an existing one. For the cancel example, you would update `my-bookings.html` to include a cancel button on each booking card.
+
+Every dashboard page must start by extending the shared layout, which gives you the sidebar, nav, and toasts automatically:
+
+```html
+{% extends "dashboard-layout.html" %}
+
+{% block content %}
+<div class="p-6 max-w-4xl mx-auto">
+
+  {% for booking in bookings %}
+    <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between">
+
+      <div>
+        <p class="font-semibold text-foreground">Seat {{ booking.destNo }}</p>
+        <p class="text-sm text-muted-foreground">{{ booking.startTime }} – {{ booking.endTime }}</p>
+      </div>
+
+      <!-- Cancel button — submits a form to the backend route -->
+      <form method="POST" action="{{ url_for('seats.cancel_booking_route') }}">
+        {{ csrf_token_field() }}
+        <input type="hidden" name="reservation_id" value="{{ booking.reservationId }}">
+        {{ Button("Cancel", variant="ghost", type="submit") }}
+      </form>
+
+    </div>
+  {% endfor %}
+
+</div>
+{% endblock %}
+```
+
+Key details:
+- `url_for('seats.cancel_booking_route')` uses the blueprint prefix `seats.` — never just `'cancel_booking_route'`.
+- The hidden `reservation_id` field passes the ID to the route without exposing it as a URL parameter.
+- The CSRF token field must be present on every form that modifies data.
+
+---
+
+**Step 5 — Pass data from the route to the template**
+
+The controller returns raw data; the route passes it to the template. Update the route that renders `my-bookings.html` to fetch bookings and send them in:
+
+```python
+# backend/routes/seats.py
+
+@seats_bp.route('/my-bookings')
+@login_required
+def my_bookings():
+    bookings = get_user_bookings(session['user_id'])   # controller call
+    return render_template("dashboard/my-bookings.html", bookings=bookings)
+```
+
+And in `backend/controllers/seats.py`, add the corresponding controller function:
+
+```python
+def get_user_bookings(user_id):
+    return query_db(
+        '''SELECT r.reservationId, r.startTime, r.endTime, r.status, s.destNo
+           FROM reservations r
+           JOIN seats s ON r.seatId = s.seatId
+           WHERE r.uId = ? AND r.status = 'active'
+           ORDER BY r.startTime''',
+        (user_id,)
+    )
+```
+
+The template uses `bookings` because that is what `render_template` received. The controller never touched a template, and the template never touched the database.
+
+---
+
+### The one rule you must not break
+
+> **Business logic never goes in `routes/`.**
+
+"Business logic" means: decisions, rules, validation, and database writes. The following code should make you stop and move it to a controller:
+
+| If you see this inside a route file... | Move it to |
+|---|---|
+| An `if/else` that enforces a rule (e.g., "can only cancel active bookings") | `controllers/` |
+| A raw SQL `UPDATE` or `INSERT` | `controllers/` |
+| More than one call to `query_db()` | `controllers/` |
+| Any calculation on data from the database | `controllers/` |
+
+Routes are allowed to have one `if/else` — checking `success` and returning different responses. That is a delivery decision, not a business rule.
+
+---
+
+### Pre-PR checklist
+
+Before you push your branch and open a pull request, run through this list:
+
+- [ ] Every new SQL query lives in `backend/controllers/`, not in `backend/routes/`
+- [ ] Every new route function has at most one `if/else` (the success/failure response split)
+- [ ] New templates extend either `layout.html` or `dashboard-layout.html`
+- [ ] All `url_for()` calls use the blueprint prefix (`auth.login`, `seats.seat_map`, `admin.admin_dashboard`, etc.)
+- [ ] Every form that writes data includes a CSRF token field
+- [ ] The virtual environment is active and `pip install -r requirements.txt` passes cleanly
+- [ ] The CSS watcher has been running — `frontend/static/css/output.css` is up to date
+- [ ] You have tested the page in the browser, not just read the code
+
+---
+
+## 7. Adding New Features
 
 ### New page
 
@@ -544,7 +786,7 @@ set nav_items = [
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | What you see | Why it happens | How to fix it |
 |---|---|---|
