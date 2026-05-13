@@ -10,33 +10,131 @@ A web application where students log in with their student ID, browse a live flo
 
 ## Table of Contents
 
-1. [Project Overview](#1-project-overview)
-2. [Repository Structure](#2-repository-structure)
-3. [Development Guide](#3-development-guide)
-   - [Prerequisites](#prerequisites)
-   - [First-Time Setup — Backend](#first-time-setup--backend)
-   - [First-Time Setup — Frontend](#first-time-setup--frontend)
-   - [Daily Development](#daily-development)
-4. [Database Guide](#4-database-guide)
-5. [Must-Know Concepts](#5-must-know-concepts)
-   - [The three-layer architecture](#the-three-layer-architecture)
-   - [Why we split routes from controllers](#why-we-split-routes-from-controllers)
-   - [How authentication and access control work](#how-authentication-and-access-control-work)
-   - [How page templates work](#how-page-templates-work)
-   - [How forms are protected](#how-forms-are-protected)
-   - [How data is read from and written to the database](#how-data-is-read-from-and-written-to-the-database)
-6. [Contributor Workflow](#6-contributor-workflow)
-   - [The mental model: data → logic → delivery](#the-mental-model-data--logic--delivery)
-   - [Backend workflow](#backend-workflow)
-   - [Frontend workflow](#frontend-workflow)
-   - [The one rule you must not break](#the-one-rule-you-must-not-break)
-   - [Pre-PR checklist](#pre-pr-checklist)
-7. [Adding New Features](#7-adding-new-features)
-8. [Troubleshooting](#8-troubleshooting)
+- [Library Seat Saving System](#library-seat-saving-system)
+  - [Table of Contents](#table-of-contents)
+  - [1. Task Checklist](#1-task-checklist)
+    - [Infrastructure](#infrastructure)
+    - [Authentication (Students \& Admins)](#authentication-students--admins)
+    - [Student — Seat Discovery \& Booking](#student--seat-discovery--booking)
+    - [Student — Booking Management](#student--booking-management)
+    - [Student — Other](#student--other)
+    - [Admin — Seat \& Zone Management](#admin--seat--zone-management)
+    - [Admin — User Management](#admin--user-management)
+    - [System Functions](#system-functions)
+  - [2. Project Overview](#2-project-overview)
+    - [The frontend / backend split](#the-frontend--backend-split)
+  - [3. Repository Structure](#3-repository-structure)
+  - [4. Development Guide](#4-development-guide)
+    - [Prerequisites](#prerequisites)
+    - [First-Time Setup — Backend](#first-time-setup--backend)
+    - [First-Time Setup — Frontend](#first-time-setup--frontend)
+    - [Daily Development](#daily-development)
+  - [4. Database Guide](#4-database-guide)
+    - [How the database is created](#how-the-database-is-created)
+    - [Starter data](#starter-data)
+    - [Creating an admin account](#creating-an-admin-account)
+    - [Resetting the database](#resetting-the-database)
+  - [5. Contributor Workflow](#5-contributor-workflow)
+    - [Backend workflow](#backend-workflow)
+    - [Frontend workflow](#frontend-workflow)
+  - [6. Adding New Features](#6-adding-new-features)
+    - [New page](#new-page)
+    - [New form](#new-form)
+    - [New database table](#new-database-table)
+  - [7. Must-Know Concepts](#7-must-know-concepts)
+    - [The three-layer architecture](#the-three-layer-architecture)
+    - [Why we split routes from controllers](#why-we-split-routes-from-controllers)
+    - [How authentication and access control work](#how-authentication-and-access-control-work)
+    - [How page templates work](#how-page-templates-work)
+    - [How forms are protected](#how-forms-are-protected)
+    - [How data is read from and written to the database](#how-data-is-read-from-and-written-to-the-database)
 
 ---
 
-## 1. Project Overview
+## 1. Task Checklist
+
+A living record of what is done and what still needs to be built. Update this as features land. Items marked `[x]` are fully functional end-to-end; items marked `[ ]` are either not started or exist only as a UI shell with no backend logic yet.
+
+> **Shell** means the route and template file exist, but the route passes no real data to the template and/or performs no database action.
+
+---
+
+### Infrastructure
+
+- [x] CSRF protection and session-based authentication
+- [x] Auth guards (`@login_required`, `@admin_required`) in `decorators.py`
+- [x] SQLite schema with all seven tables: `users`, `zones`, `seats`, `reservations`, `check_in_logs`, `penalties`, `admin_action_logs`
+- [x] Database auto-initialized from `schema.sql` on first server start
+- [x] Seed data — 4 zones, 26 seats pre-loaded via `INSERT OR IGNORE`
+- [x] Auto-release database trigger — marks reservations `no_show` and frees the seat if the student does not check in within 30 minutes
+
+---
+
+### Authentication (Students & Admins)
+
+- [x] Student registration (Student ID, full name, optional phone number, password)
+- [x] Login with Student ID and password
+- [x] Logout
+- [x] Suspended-account check on every login attempt and on every protected page load
+- [x] Admin login redirects to admin dashboard; student login redirects to student dashboard
+
+---
+
+### Student — Seat Discovery & Booking
+
+- [x] Interactive seat map with zones and color-coded real-time seat status
+- [x] Book a seat — choose date, start time, and duration (1–4 hours)
+- [x] Atomic seat claim — race-condition safe (no double-booking)
+- [ ] Search or filter available seats by date and time slot
+- [ ] Show seat details on click (zone, desk number, current status)
+
+---
+
+### Student — Booking Management
+
+- [ ] View personal reservations — route and template exist (**shell only**, no DB query wired up)
+- [ ] Cancel an active reservation (frees the seat)
+- [ ] Modify a reservation's time slot
+- [ ] Extend a reservation (if the seat is still available)
+- [ ] Check in to a reservation (creates a `check_in_logs` record)
+- [ ] Check out of a reservation
+- [ ] View booking history (past and cancelled reservations)
+
+---
+
+### Student — Other
+
+- [ ] Report a problem (e.g., a broken seat, a no-show neighbor)
+
+---
+
+### Admin — Seat & Zone Management
+
+- [x] Admin dashboard — overview of all zones and aggregate seat stats (total, blocked)
+- [ ] Block a seat for maintenance (change status to `maintenance`)
+- [ ] Unblock a seat (restore it to `available`)
+- [ ] View and override any active reservation
+- [ ] Enable or disable the booking system globally (e.g., for public holidays)
+
+---
+
+### Admin — User Management
+
+- [ ] View all registered users — route and template exist (**shell only**, no DB query wired up)
+- [ ] Search or filter users by name or Student ID
+- [ ] View a user's reservation history and no-show count
+- [ ] Suspend a user account (blocks future logins)
+- [ ] Reinstate a suspended account
+
+---
+
+### System Functions
+
+- [ ] Penalty management — log no-shows and automatically suspend users who exceed the limit
+- [ ] Admin action log — record every admin action (account suspend, booking override, seat block) to `admin_action_logs`
+- [ ] Check-in / check-out logging — write to `check_in_logs` and mark `checkOutTime` on departure
+
+## 2. Project Overview
 
 This system replaces the habit of saving library seats with bags. Students log in, pick a seat on a live floor plan, and get a confirmed reservation. Admins can see all zones, block seats for maintenance, and manage user accounts.
 
@@ -54,17 +152,14 @@ library-seat-saving-system/
 
 **Frontend** defines what every page *looks like* — layout, buttons, colors, and forms. Flask reads these HTML files, fills in live data, and sends the result to the browser. The CSS is compiled by Tailwind, a Node.js tool.
 
-> **Important:** This is not the classic "separate API + separate React app" split. The backend *serves* the frontend files — they are two folders inside one project, not two independently-running programs. You only ever start one server (`flask run`).
-
 ---
 
-## 2. Repository Structure
+## 3. Repository Structure
 
 ```
 library-seat-saving-system/
 │
 ├── README.md                  ← You are here
-├── ER-models.png              ← Entity-relationship diagram
 │
 ├── backend/                   ← Everything the Python server needs
 │   ├── main.py                ← App entry point: creates the Flask app, registers blueprints
@@ -91,8 +186,8 @@ library-seat-saving-system/
 └── frontend/                  ← Everything the browser sees
     ├── package.json           ← Node packages (Tailwind CLI)
     ├── templates/             ← HTML pages (Flask fills these in with live data)
-    │   ├── layout.html                ← Shared shell for public pages
-    │   ├── dashboard-layout.html      ← Shared shell for logged-in pages (sidebar, nav)
+    │   ├── layout.html                ← Shared layout for public pages
+    │   ├── dashboard-layout.html      ← Shared layout for logged-in pages (sidebar, nav)
     │   ├── index.html                 ← Landing page
     │   ├── auth/
     │   │   ├── login.html
@@ -112,7 +207,7 @@ library-seat-saving-system/
 
 ---
 
-## 3. Development Guide
+## 4. Development Guide
 
 ### Prerequisites
 
@@ -132,46 +227,40 @@ If a command is not found, download the tool from its official website, install 
 
 Do these steps once, right after cloning the repository.
 
-**Step 1 — Get the code**
+**Step 1: Get the code**
 
 ```bash
 git clone https://github.com/dtran2108/library-seat-saving-system.git
 cd library-seat-saving-system
 ```
 
-**Step 2 — Create a Python virtual environment**
-
-A virtual environment is a sandboxed Python installation just for this project. It keeps the packages you install here from conflicting with other projects on your computer.
+**Step 2: Create a Python virtual environment**
 
 ```bash
 # Run this once from the project root
-python3 -m venv myenv
+python3 -m venv <your_environment_name>
 ```
 
-**Step 3 — Activate the virtual environment**
+**Step 3: Activate the virtual environment**
 
 You must activate the environment every time you open a new terminal window.
 
 ```bash
 # macOS / Linux
-source myenv/bin/activate
+source <your_environment_name>/bin/activate
 
 # Windows (Command Prompt)
-myenv\Scripts\activate
+<your_environment_name>\Scripts\activate
 ```
 
-When it is active, your terminal prompt will show `(myenv)` at the start. If you don't see that prefix, the environment is not active — packages will not be found.
-
-**Step 4 — Install Python packages**
+**Step 4: Install Python packages**
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-This reads `backend/requirements.txt` and installs Flask, Flask-WTF, WTForms, and Werkzeug.
-
-**Step 5 — Create your environment file**
+**Step 5: Create your environment file**
 
 ```bash
 # Still inside backend/
@@ -184,16 +273,16 @@ Open `backend/.env` and paste in a real secret key. Generate one with:
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-Copy the printed value and set it as `SECRET_KEY` in `.env`. For local development, the app has a fallback key so this step is optional — but get into the habit.
+Copy the printed value and set it as `SECRET_KEY` in `.env`. For local development, the app has a fallback key so this step is optional.
 
-**Step 6 — Start the Flask server**
+**Step 6: Start the Flask server**
 
 ```bash
 # From inside backend/
 flask --app main run --debug
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. The landing page means everything is working. The database file (`backend/library.db`) is created automatically on first start.
+Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser. The database file (`backend/library.db`) is created automatically on first start.
 
 ---
 
@@ -228,7 +317,7 @@ Every time you sit down to work, you need **two terminals** running simultaneous
 **Terminal 1 — CSS watcher** (from `frontend/`)
 
 ```bash
-source ../myenv/bin/activate      # macOS/Linux — skip if already active
+source ../<your_environment_name>/bin/activate      # macOS/Linux — skip if already active
 npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch
 ```
 
@@ -237,7 +326,7 @@ Leave this running. It automatically rebuilds the CSS whenever you save a templa
 **Terminal 2 — Flask server** (from `backend/`)
 
 ```bash
-source ../myenv/bin/activate      # macOS/Linux — skip if already active
+source ../<your_environment_name>/bin/activate      # macOS/Linux — skip if already active
 flask --app main run --debug
 ```
 
@@ -290,7 +379,249 @@ cd backend && flask --app main run --debug
 
 ---
 
-## 5. Must-Know Concepts
+## 5. Contributor Workflow
+
+This section is a step-by-step guide for adding any new feature to the project.
+
+---
+
+### Backend workflow
+
+We will use an example for this: **cancelling a booking**. A student clicks "Cancel" on their booking, the reservation status changes to `'cancelled'`, and the seat is freed up.
+
+---
+
+**Step 1: Write the controller function**
+
+Open (or create) the relevant file under `backend/controllers/` and write a function that contains all the logic. This function must not import anything from Flask.
+
+```python
+# backend/controllers/seats.py
+
+def cancel_booking(user_id, reservation_id):
+    """Cancel a reservation if it belongs to the requesting user.
+
+    Returns (True, success_msg) or (False, error_msg).
+    """
+    # Rule 1: does this reservation exist and belong to this user?
+    reservation = query_db(
+        'SELECT reservationId, seatId, status FROM reservations '
+        'WHERE reservationId = ? AND uId = ?',
+        (reservation_id, user_id),
+        one=True
+    )
+    if not reservation:
+        return False, 'Reservation not found.'
+
+    # Rule 2: can only cancel active reservations.
+    if reservation['status'] != 'active':
+        return False, 'Only active reservations can be cancelled.'
+
+    db = get_db()
+    db.execute(
+        "UPDATE reservations SET status = 'cancelled' WHERE reservationId = ?",
+        (reservation_id,)
+    )
+    db.execute(
+        "UPDATE seats SET status = 'available' WHERE seatId = ?",
+        (reservation['seatId'],)
+    )
+    db.commit()
+    return True, 'Booking cancelled successfully.'
+```
+
+Notice what this function does **not** do: it never touches `request`, `session`, `flash`, or `render_template`. It is pure logic that happens to use the database. You could call it from a test, a CLI script, or a scheduled job — not just an HTTP request.
+
+---
+
+**Step 2: Register the route**
+
+Open the relevant file under `backend/routes/` and write a thin route that does exactly three things: read the request, call the controller, return the response.
+
+```python
+# backend/routes/seats.py
+
+@seats_bp.route('/api/cancel-booking', methods=['POST'])
+@login_required
+def cancel_booking_route():
+    reservation_id = request.form.get('reservation_id', '').strip()  # 1. read
+
+    success, message = cancel_booking(session['user_id'], reservation_id)  # 2. call
+
+    if success:                                                        # 3. respond
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message)
+```
+
+That is the entire route function. Three lines of real logic. If you find yourself writing `if`/`else` business rules or SQL queries inside a route, stop — those belong in the controller.
+
+> **Why import the controller function, not copy-paste the code?**
+> Because next month, the cancellation rule will change ("only cancel 30 minutes before start time"). You will change it in one place — `controllers/seats.py` — and every route that calls `cancel_booking()` gets the fix for free.
+
+---
+
+### Frontend workflow
+
+With the backend in place, here is how to build the UI that calls it.
+
+---
+
+**Step 3: Check the component library before building anything new**
+
+Look inside `frontend/templates/components/ui/` before writing any HTML from scratch. The project already has macros for buttons, inputs, icons, and dialogs. Reusing them keeps the UI consistent and saves you time.
+
+```
+frontend/templates/components/ui/
+├── button.html        ← Button(label, variant, size)
+├── input.html         ← Input(field)
+├── icon.html          ← Icon(name, class)
+├── alert-dialog.html  ← AlertDialog(id, title, …)
+└── toast.html         ← ToastContainer()
+```
+
+Import a macro at the top of your template file before using it:
+
+```html
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/icon.html" import Icon %}
+```
+
+---
+
+**Step 4: Create or update the template**
+
+Either create a new file in `frontend/templates/dashboard/` or add to an existing one. For the cancel example, you would update `my-bookings.html` to include a cancel button on each booking card.
+
+Every dashboard page must start by extending the shared layout, which gives you the sidebar, nav, and toasts automatically:
+
+```html
+{% extends "dashboard-layout.html" %}
+
+{% block content %}
+<div class="p-6 max-w-4xl mx-auto">
+
+  {% for booking in bookings %}
+    <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between">
+
+      <div>
+        <p class="font-semibold text-foreground">Seat {{ booking.destNo }}</p>
+        <p class="text-sm text-muted-foreground">{{ booking.startTime }} – {{ booking.endTime }}</p>
+      </div>
+
+      <!-- Cancel button — submits a form to the backend route -->
+      <form method="POST" action="{{ url_for('seats.cancel_booking_route') }}">
+        {{ csrf_token_field() }}
+        <input type="hidden" name="reservation_id" value="{{ booking.reservationId }}">
+        {{ Button("Cancel", variant="ghost", type="submit") }}
+      </form>
+
+    </div>
+  {% endfor %}
+
+</div>
+{% endblock %}
+```
+
+Key details:
+- `url_for('seats.cancel_booking_route')` uses the blueprint prefix `seats.` — never just `'cancel_booking_route'`.
+- The hidden `reservation_id` field passes the ID to the route without exposing it as a URL parameter.
+- The CSRF token field must be present on every form that modifies data.
+
+---
+
+**Step 5: Pass data from the route to the template**
+
+The controller returns raw data; the route passes it to the template. Update the route that renders `my-bookings.html` to fetch bookings and send them in:
+
+```python
+# backend/routes/seats.py
+
+@seats_bp.route('/my-bookings')
+@login_required
+def my_bookings():
+    bookings = get_user_bookings(session['user_id'])   # controller call
+    return render_template("dashboard/my-bookings.html", bookings=bookings)
+```
+
+And in `backend/controllers/seats.py`, add the corresponding controller function:
+
+```python
+def get_user_bookings(user_id):
+    return query_db(
+        '''SELECT r.reservationId, r.startTime, r.endTime, r.status, s.destNo
+           FROM reservations r
+           JOIN seats s ON r.seatId = s.seatId
+           WHERE r.uId = ? AND r.status = 'active'
+           ORDER BY r.startTime''',
+        (user_id,)
+    )
+```
+
+The template uses `bookings` because that is what `render_template` received. The controller never touched a template, and the template never touched the database.
+
+---
+
+## 6. Adding New Features
+
+### New page
+
+The new three-layer structure means a new page has three touch points: a controller function, a route, and a template.
+
+**Step 1: Add a controller function** in the relevant file under `backend/controllers/`:
+
+```python
+# backend/controllers/seats.py
+def get_my_new_data():
+    return query_db('SELECT * FROM some_table')
+```
+
+**Step 2: Add a route** in the relevant file under `backend/routes/`:
+
+```python
+# backend/routes/seats.py
+@seats_bp.route('/my-new-page')
+@login_required
+def my_new_page():
+    data = get_my_new_data()                             # call controller
+    return render_template("dashboard/my-new-page.html", data=data)  # render
+```
+
+**Step 3: Create the template** at `frontend/templates/dashboard/my-new-page.html`:
+
+```html
+{% extends "dashboard-layout.html" %}
+{% block content %}
+  <h1>My New Page</h1>
+{% endblock %}
+```
+
+**Step 4: Add a nav link** (optional) in `frontend/templates/dashboard-layout.html`:
+
+```jinja
+set nav_items = [
+    ...
+    {'endpoint': 'seats.my_new_page', 'label': 'My Page', 'icon': 'some-icon'},
+]
+```
+
+### New form
+
+1. Add a form class in `backend/forms/auth.py` (or a new file in `backend/forms/`).
+2. Export it from `backend/forms/__init__.py`.
+3. Import and instantiate it in the relevant **route** file, then pass it to `render_template`.
+4. Add business logic for handling the submission to the matching **controller** file.
+5. In the template, always include `{{ form.hidden_tag() }}` as the first line inside `<form>`.
+
+### New database table
+
+1. Add `CREATE TABLE IF NOT EXISTS ...` to `backend/schema.sql`.
+2. Add any starter rows with `INSERT OR IGNORE`.
+3. Delete `backend/library.db` and restart the server so the new table is created.
+4. Add query functions to `backend/controllers/` as needed.
+
+---
+
+## 7. Must-Know Concepts
 
 You don't need to memorise all of this before touching the code. But reading it once will save you a lot of confusion when something breaks or when you need to add a feature.
 
@@ -347,20 +678,10 @@ Browser request
 
 ### Why we split routes from controllers
 
-Before this refactor, all the code for each page lived together in a single `main.py`. A route function would parse the request, apply business rules, query the database, *and* return the response — all in one place.
-
-That works for small apps, but it gets painful quickly:
-
-- **Hard to find things.** To change the booking rule (e.g., max 4 hours), you had to search through page-handling code to find where that number lives.
-- **Hard to reuse logic.** If two pages both needed to check seat availability, you either duplicated the code or wrote a one-off helper inside `main.py`.
-- **Hard to reason about errors.** A bug in booking logic was buried inside a function that also handled redirects and flash messages.
-
-With the current split:
-
 - **Routes** only care about HTTP — what came in, what goes out. They are thin wrappers.
 - **Controllers** only care about business rules — they can be read and understood without knowing anything about Flask.
 
-As a practical example, here is how booking works now:
+For example, here is how booking works:
 
 ```python
 # routes/seats.py — only HTTP concerns
@@ -487,314 +808,3 @@ db.execute('INSERT INTO users (uId, uname, password, role, ustatus) VALUES (?, ?
            (student_id, full_name, hashed_password, 'user', 'active'))
 db.commit()   # without this, the change is not saved to disk
 ```
-
----
-
-## 6. Contributor Workflow
-
-This section is a step-by-step guide for adding any new feature to the project. It exists because the most common mistake newcomers make is putting too much code in the wrong place — specifically, writing business logic directly inside a route. Following this sequence every time prevents that.
-
----
-
-### The mental model: data → logic → delivery
-
-Before you write a single line of code, think about your feature in three stages:
-
-```
-1. DATA      What does the database need to store or return?
-                └─▶ Write a function in backend/controllers/
-
-2. LOGIC     What rules apply? What can go wrong?
-                └─▶ Write the checks inside that same controller function
-
-3. DELIVERY  How does the browser ask for it, and what does it get back?
-                └─▶ Write a thin route in backend/routes/
-                └─▶ Write or update a template in frontend/templates/
-```
-
-A useful test for whether something belongs in a **controller**: can you read the function without knowing what Flask is? If it uses `request`, `render_template`, `session`, or `redirect`, it does not belong in a controller — those are delivery concerns.
-
-A useful test for whether something belongs in a **route**: is it doing anything other than reading the request, calling a controller, and returning a response? If yes, move that part to a controller.
-
----
-
-### Backend workflow
-
-We will use a concrete example throughout: **cancelling a booking**. A student clicks "Cancel" on their booking, the reservation status changes to `'cancelled'`, and the seat is freed up.
-
----
-
-**Step 1 — Write the controller function**
-
-Open (or create) the relevant file under `backend/controllers/` and write a function that contains all the logic. This function must not import anything from Flask.
-
-```python
-# backend/controllers/seats.py
-
-def cancel_booking(user_id, reservation_id):
-    """Cancel a reservation if it belongs to the requesting user.
-
-    Returns (True, success_msg) or (False, error_msg).
-    """
-    # Rule 1: does this reservation exist and belong to this user?
-    reservation = query_db(
-        'SELECT reservationId, seatId, status FROM reservations '
-        'WHERE reservationId = ? AND uId = ?',
-        (reservation_id, user_id),
-        one=True
-    )
-    if not reservation:
-        return False, 'Reservation not found.'
-
-    # Rule 2: can only cancel active reservations.
-    if reservation['status'] != 'active':
-        return False, 'Only active reservations can be cancelled.'
-
-    db = get_db()
-    db.execute(
-        "UPDATE reservations SET status = 'cancelled' WHERE reservationId = ?",
-        (reservation_id,)
-    )
-    db.execute(
-        "UPDATE seats SET status = 'available' WHERE seatId = ?",
-        (reservation['seatId'],)
-    )
-    db.commit()
-    return True, 'Booking cancelled successfully.'
-```
-
-Notice what this function does **not** do: it never touches `request`, `session`, `flash`, or `render_template`. It is pure logic that happens to use the database. You could call it from a test, a CLI script, or a scheduled job — not just an HTTP request.
-
----
-
-**Step 2 — Register the route**
-
-Open the relevant file under `backend/routes/` and write a thin route that does exactly three things: read the request, call the controller, return the response.
-
-```python
-# backend/routes/seats.py
-
-@seats_bp.route('/api/cancel-booking', methods=['POST'])
-@login_required
-def cancel_booking_route():
-    reservation_id = request.form.get('reservation_id', '').strip()  # 1. read
-
-    success, message = cancel_booking(session['user_id'], reservation_id)  # 2. call
-
-    if success:                                                        # 3. respond
-        return jsonify(success=True, message=message)
-    return jsonify(success=False, error=message)
-```
-
-That is the entire route function. Three lines of real logic. If you find yourself writing `if`/`else` business rules or SQL queries inside a route, stop — those belong in the controller.
-
-> **Why import the controller function, not copy-paste the code?**
-> Because next month, the cancellation rule will change ("only cancel 30 minutes before start time"). You will change it in one place — `controllers/seats.py` — and every route that calls `cancel_booking()` gets the fix for free.
-
----
-
-### Frontend workflow
-
-With the backend in place, here is how to build the UI that calls it.
-
----
-
-**Step 3 — Check the component library before building anything new**
-
-Look inside `frontend/templates/components/ui/` before writing any HTML from scratch. The project already has macros for buttons, inputs, icons, and dialogs. Reusing them keeps the UI consistent and saves you time.
-
-```
-frontend/templates/components/ui/
-├── button.html        ← Button(label, variant, size)
-├── input.html         ← Input(field)
-├── icon.html          ← Icon(name, class)
-├── alert-dialog.html  ← AlertDialog(id, title, …)
-└── toast.html         ← ToastContainer()
-```
-
-Import a macro at the top of your template file before using it:
-
-```html
-{% from "components/ui/button.html" import Button %}
-{% from "components/ui/icon.html" import Icon %}
-```
-
----
-
-**Step 4 — Create or update the template**
-
-Either create a new file in `frontend/templates/dashboard/` or add to an existing one. For the cancel example, you would update `my-bookings.html` to include a cancel button on each booking card.
-
-Every dashboard page must start by extending the shared layout, which gives you the sidebar, nav, and toasts automatically:
-
-```html
-{% extends "dashboard-layout.html" %}
-
-{% block content %}
-<div class="p-6 max-w-4xl mx-auto">
-
-  {% for booking in bookings %}
-    <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between">
-
-      <div>
-        <p class="font-semibold text-foreground">Seat {{ booking.destNo }}</p>
-        <p class="text-sm text-muted-foreground">{{ booking.startTime }} – {{ booking.endTime }}</p>
-      </div>
-
-      <!-- Cancel button — submits a form to the backend route -->
-      <form method="POST" action="{{ url_for('seats.cancel_booking_route') }}">
-        {{ csrf_token_field() }}
-        <input type="hidden" name="reservation_id" value="{{ booking.reservationId }}">
-        {{ Button("Cancel", variant="ghost", type="submit") }}
-      </form>
-
-    </div>
-  {% endfor %}
-
-</div>
-{% endblock %}
-```
-
-Key details:
-- `url_for('seats.cancel_booking_route')` uses the blueprint prefix `seats.` — never just `'cancel_booking_route'`.
-- The hidden `reservation_id` field passes the ID to the route without exposing it as a URL parameter.
-- The CSRF token field must be present on every form that modifies data.
-
----
-
-**Step 5 — Pass data from the route to the template**
-
-The controller returns raw data; the route passes it to the template. Update the route that renders `my-bookings.html` to fetch bookings and send them in:
-
-```python
-# backend/routes/seats.py
-
-@seats_bp.route('/my-bookings')
-@login_required
-def my_bookings():
-    bookings = get_user_bookings(session['user_id'])   # controller call
-    return render_template("dashboard/my-bookings.html", bookings=bookings)
-```
-
-And in `backend/controllers/seats.py`, add the corresponding controller function:
-
-```python
-def get_user_bookings(user_id):
-    return query_db(
-        '''SELECT r.reservationId, r.startTime, r.endTime, r.status, s.destNo
-           FROM reservations r
-           JOIN seats s ON r.seatId = s.seatId
-           WHERE r.uId = ? AND r.status = 'active'
-           ORDER BY r.startTime''',
-        (user_id,)
-    )
-```
-
-The template uses `bookings` because that is what `render_template` received. The controller never touched a template, and the template never touched the database.
-
----
-
-### The one rule you must not break
-
-> **Business logic never goes in `routes/`.**
-
-"Business logic" means: decisions, rules, validation, and database writes. The following code should make you stop and move it to a controller:
-
-| If you see this inside a route file... | Move it to |
-|---|---|
-| An `if/else` that enforces a rule (e.g., "can only cancel active bookings") | `controllers/` |
-| A raw SQL `UPDATE` or `INSERT` | `controllers/` |
-| More than one call to `query_db()` | `controllers/` |
-| Any calculation on data from the database | `controllers/` |
-
-Routes are allowed to have one `if/else` — checking `success` and returning different responses. That is a delivery decision, not a business rule.
-
----
-
-### Pre-PR checklist
-
-Before you push your branch and open a pull request, run through this list:
-
-- [ ] Every new SQL query lives in `backend/controllers/`, not in `backend/routes/`
-- [ ] Every new route function has at most one `if/else` (the success/failure response split)
-- [ ] New templates extend either `layout.html` or `dashboard-layout.html`
-- [ ] All `url_for()` calls use the blueprint prefix (`auth.login`, `seats.seat_map`, `admin.admin_dashboard`, etc.)
-- [ ] Every form that writes data includes a CSRF token field
-- [ ] The virtual environment is active and `pip install -r requirements.txt` passes cleanly
-- [ ] The CSS watcher has been running — `frontend/static/css/output.css` is up to date
-- [ ] You have tested the page in the browser, not just read the code
-
----
-
-## 7. Adding New Features
-
-### New page
-
-The new three-layer structure means a new page has three touch points: a controller function, a route, and a template.
-
-**Step 1 — Add a controller function** in the relevant file under `backend/controllers/`:
-
-```python
-# backend/controllers/seats.py
-def get_my_new_data():
-    return query_db('SELECT * FROM some_table')
-```
-
-**Step 2 — Add a route** in the relevant file under `backend/routes/`:
-
-```python
-# backend/routes/seats.py
-@seats_bp.route('/my-new-page')
-@login_required
-def my_new_page():
-    data = get_my_new_data()                             # call controller
-    return render_template("dashboard/my-new-page.html", data=data)  # render
-```
-
-**Step 3 — Create the template** at `frontend/templates/dashboard/my-new-page.html`:
-
-```html
-{% extends "dashboard-layout.html" %}
-{% block content %}
-  <h1>My New Page</h1>
-{% endblock %}
-```
-
-**Step 4 — Add a nav link** (optional) in `frontend/templates/dashboard-layout.html`:
-
-```jinja
-set nav_items = [
-    ...
-    {'endpoint': 'seats.my_new_page', 'label': 'My Page', 'icon': 'some-icon'},
-]
-```
-
-### New form
-
-1. Add a form class in `backend/forms/auth.py` (or a new file in `backend/forms/`).
-2. Export it from `backend/forms/__init__.py`.
-3. Import and instantiate it in the relevant **route** file, then pass it to `render_template`.
-4. Add business logic for handling the submission to the matching **controller** file.
-5. In the template, always include `{{ form.hidden_tag() }}` as the first line inside `<form>`.
-
-### New database table
-
-1. Add `CREATE TABLE IF NOT EXISTS ...` to `backend/schema.sql`.
-2. Add any starter rows with `INSERT OR IGNORE`.
-3. Delete `backend/library.db` and restart the server so the new table is created.
-4. Add query functions to `backend/controllers/` as needed.
-
----
-
-## 8. Troubleshooting
-
-| What you see | Why it happens | How to fix it |
-|---|---|---|
-| `RuntimeError: No application found` | A Python file was run outside Flask's context | Run via `flask --app main run` from `backend/`, or wrap the code in `with app.app_context():` |
-| `BuildError: Could not build url for endpoint 'login'` | A template or redirect still uses an old un-prefixed endpoint name | Endpoint names now use blueprint prefixes: `auth.login`, `seats.seat_map`, `admin.admin_dashboard`, etc. |
-| `400 Bad Request` on a form submission | The CSRF token is missing | Ensure `{{ form.hidden_tag() }}` is the first element inside your `<form>` tag |
-| Page looks completely unstyled | The Tailwind output file was not built | Run the build command from `frontend/`, or start watch mode |
-| Changes to Python files are not reflected | The virtual environment is not active | Check that `(myenv)` appears in your terminal prompt; re-run `source myenv/bin/activate` if not |
-| Old schema after adding a new table | The database file predates your change | Delete `backend/library.db` and restart the server |
-| `OperationalError: no such table` | The database was not initialized | Ensure the server starts without errors; `init_db()` runs automatically on startup |
-| Login redirects back to the login page forever | You are already logged in | Clear browser cookies, or open a private/incognito window |
