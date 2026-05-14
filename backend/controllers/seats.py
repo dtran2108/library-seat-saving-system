@@ -1,6 +1,28 @@
 from datetime import datetime, timedelta
-from db import query_db, get_db, get_zones_with_seats
+from db import query_db, get_db
 
+def get_zones_with_seats():
+    zones = query_db('SELECT * FROM zones ORDER BY zoneId')
+    result = []
+    for zone in zones:
+        seats = query_db(
+            'SELECT seatId, destNo, status FROM seats WHERE zoneId = ? ORDER BY destNo',
+            (zone['zoneId'],),
+        )
+        # Convert sqlite3.Row objects to plain dicts so Jinja2 templates can
+        # access them with dot notation and dict syntax interchangeably.
+        seat_list = [dict(s) for s in seats]
+        result.append({
+            'zoneId':      zone['zoneId'],
+            'name':        zone['name'],
+            'location':    zone['location'],
+            'cols':        zone['cols'],
+            'zone_status': zone['status'],
+            'seats':       seat_list,
+            'total':       len(seat_list),
+            'available':   sum(1 for s in seat_list if s['status'] == 'available'),
+        })
+    return result
 
 def get_seat_map_data():
     return get_zones_with_seats()
