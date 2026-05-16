@@ -12,6 +12,25 @@ from controllers.seats import (
 
 seats_bp = Blueprint('seats', __name__)
 
+@seats_bp.route('/dashboard', methods=['GET', 'POST'])
+@login_required
+def user_dashboard():
+    return render_template("dashboard/user-dashboard.html")
+
+
+@seats_bp.route('/seat-map')
+@login_required
+def seat_map():
+    update_expired_reservations()
+    zones = get_seat_map_data()
+    return render_template("dashboard/seat-map.html", zones=zones, today=date.today().isoformat())
+
+
+@seats_bp.route('/my-bookings')
+@login_required
+def my_bookings():
+    return render_template("dashboard/my-bookings.html")
+
 
 @seats_bp.route('/api/book', methods=['POST'])
 @login_required
