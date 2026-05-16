@@ -46,6 +46,40 @@ def api_book():
         return jsonify(success=True, message=message)
     return jsonify(success=False, error=message)
 
+@seats_bp.route('/api/book', methods=['POST'])
+@login_required
+def api_book():
+    seat_id      = request.form.get('seat_id', '').strip()
+    booking_date = request.form.get('booking_date', '').strip()
+    start_time   = request.form.get('start_time', '').strip()
+    duration     = request.form.get('duration', '').strip()
+
+    success, message = book_seat(session['user_id'], seat_id, booking_date, start_time, duration)
+    if success:
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message), 400
+
+@seats_bp.route('/api/my-bookings')
+@login_required
+def api_my_bookings():
+    reservations = get_user_reservations(session['user_id'])
+    return jsonify(success=True, reservations=reservations)
+
+@seats_bp.route('/api/cancel/<int:reservation_id>', methods=['POST', 'DELETE'])
+@login_required
+def api_cancel(reservation_id):
+    success, message = cancel_reservation(
+        reservation_id,
+        session['user_id'],
+        session.get('role') == 'admin'
+    )
+
+    if success:
+        return jsonify(success=True, message=message)
+
+    return jsonify(success=False, error=message), 400
+
+
 @seats_bp.route('/api/available')
 @login_required
 def api_available():
@@ -64,11 +98,15 @@ def api_available():
     if success:
         return jsonify(success=True, seats=result)
 
+    return jsonify(success=False, error=result), 400
+
+
 @seats_bp.route('/api/my-bookings')
 @login_required
 def api_my_bookings():
     reservations = get_user_reservations(session['user_id'])
     return jsonify(success=True, reservations=reservations)
+
 
 @seats_bp.route('/api/cancel/<int:reservation_id>', methods=['POST', 'DELETE'])
 @login_required
