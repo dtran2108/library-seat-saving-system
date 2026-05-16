@@ -473,16 +473,16 @@ def cancel_booking(user_id, reservation_id):
     # Rule 1: does this reservation exist and belong to this user?
     reservation = query_db(
         'SELECT reservationId, seatId, status FROM reservations '
-        'WHERE reservationId = ? AND uId = ?',
+        'WHERE reservationId = ? AND userId = ?',
         (reservation_id, user_id),
         one=True
     )
     if not reservation:
         return False, 'Reservation not found.'
 
-    # Rule 2: can only cancel active reservations.
-    if reservation['status'] != 'active':
-        return False, 'Only active reservations can be cancelled.'
+    # Rule 2: can only cancel upcoming or active reservations.
+    if reservation['status'] not in ('upcoming', 'active'):
+        return False, 'Only upcoming or active reservations can be cancelled.'
 
     db = get_db()
     db.execute(
@@ -571,7 +571,7 @@ Every dashboard page must start by extending the shared layout, which gives you 
     <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between">
 
       <div>
-        <p class="font-semibold text-foreground">Seat {{ booking.destNo }}</p>
+        <p class="font-semibold text-foreground">Seat {{ booking.deskNo }}</p>
         <p class="text-sm text-muted-foreground">{{ booking.startTime }} – {{ booking.endTime }}</p>
       </div>
 
@@ -615,10 +615,10 @@ And in `backend/controllers/seats.py`, add the corresponding controller function
 ```python
 def get_user_bookings(user_id):
     return query_db(
-        '''SELECT r.reservationId, r.startTime, r.endTime, r.status, s.destNo
+        '''SELECT r.reservationId, r.startTime, r.endTime, r.status, s.deskNo
            FROM reservations r
            JOIN seats s ON r.seatId = s.seatId
-           WHERE r.uId = ? AND r.status = 'active'
+           WHERE r.userId = ? AND r.status IN ('upcoming', 'active')
            ORDER BY r.startTime''',
         (user_id,)
     )
@@ -642,10 +642,11 @@ The walkthrough above covers a full feature. For smaller, repeatable additions, 
 
 **Adding a new database table**
 
-1. Add `CREATE TABLE IF NOT EXISTS ...` to `backend/schema.sql` (DDL only).
-2. Add any starter rows with `INSERT OR IGNORE` to `backend/seed.sql`.
-3. Delete `backend/library.db` and restart the server so the new table is created.
-4. Add query functions to `backend/controllers/` as needed.
+1. Add a matching `DROP TABLE IF EXISTS ...` to the "Clean slate" block at the top of `backend/schema.sql` (in reverse FK order — dependents first).
+2. Add the `CREATE TABLE ...` statement further down in `backend/schema.sql` (DDL only).
+3. Add any starter rows with `INSERT OR IGNORE` to `backend/seed.sql`.
+4. Delete `backend/library.db` and restart the server so the new table is created. `init_db()` skips when the file exists, so a restart alone is not enough.
+5. Add query functions to `backend/controllers/` as needed.
 
 **Adding a new navigation link**
 
@@ -719,7 +720,7 @@ A living record of what is done and what still needs to be built. Update this as
 ### Admin — Seat & Zone Management
 
 - [x] Admin dashboard — overview of all zones and aggregate seat stats (total, blocked)
-- [ ] Block a seat for maintenance (change status to `maintenance`)
+- [ ] Block a seat for maintenance (change status to `blocked`)
 - [ ] Unblock a seat (restore it to `available`)
 - [ ] View and override any active reservation
 - [ ] Enable or disable the booking system globally (e.g., for public holidays)
