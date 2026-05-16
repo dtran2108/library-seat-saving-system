@@ -215,7 +215,7 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
 
     seat_conflict = query_db(
         """
-        SELECT rId
+        SELECT reservationId
         FROM reservations
         WHERE seatId = ?
         AND status = 'active'
@@ -231,7 +231,7 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
 
     user_conflict = query_db(
         """
-        SELECT rId
+        SELECT reservationId
         FROM reservations
         WHERE uId = ?
         AND status = 'active'
@@ -276,7 +276,7 @@ def get_user_reservations(user_id):
     reservations = query_db(
         """
         SELECT
-            r.rId,
+            r.reservationId,
             r.uId,
             r.seatId,
             r.startTime,
@@ -300,9 +300,9 @@ def get_user_reservations(user_id):
 def cancel_reservation(reservation_id, user_id, is_admin=False):
     reservation = query_db(
         """
-        SELECT rId, uId, seatId, status
+        SELECT reservationId, uId, seatId, status
         FROM reservations
-        WHERE rId = ?
+        WHERE reservationId = ?
         """,
         (reservation_id,),
         one=True
@@ -323,7 +323,7 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
         """
         UPDATE reservations
         SET status = 'cancelled'
-        WHERE rId = ?
+        WHERE reservationId = ?
         """,
         (reservation_id,)
     )
@@ -332,7 +332,7 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
 
     active_now = query_db(
         """
-        SELECT rId
+        SELECT reservationId
         FROM reservations
         WHERE seatId = ?
         AND status = 'active'
