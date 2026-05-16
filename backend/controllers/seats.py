@@ -266,7 +266,10 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
             (seat_id,)
         )
 
-    def get_user_reservations(user_id):
+    db.commit()
+    return True, 'Seat booked successfully!'
+
+def get_user_reservations(user_id):
     update_expired_reservations()
 
     reservations = query_db(
@@ -291,7 +294,6 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
     )
 
     return [dict(row) for row in reservations]
-
 
 def cancel_reservation(reservation_id, user_id, is_admin=False):
     reservation = query_db(
@@ -352,7 +354,3 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
 
     db.commit()
     return True, 'Reservation cancelled successfully.'
-
-        
-    db.commit()
-    return True, 'Seat booked successfully!'
