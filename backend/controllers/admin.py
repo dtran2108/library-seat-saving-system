@@ -1,4 +1,5 @@
-from db import query_db, get_zones_with_seats
+from db import query_db
+from controllers.seats import get_zones_with_seats
 
 
 def get_dashboard_data():
@@ -7,7 +8,7 @@ def get_dashboard_data():
     # One query instead of looping over zones — much faster with many zones.
     stats = query_db(
         '''SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN status = "maintenance" THEN 1 ELSE 0 END) AS blocked
+                  SUM(CASE WHEN status = "blocked" THEN 1 ELSE 0 END) AS blocked
            FROM seats''',
         one=True
     )

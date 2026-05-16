@@ -70,7 +70,7 @@ class SignUpForm(FlaskForm):
         validators=[
             DataRequired(),
             # EqualTo compares this field's value to another field's value at
-            # submission time. We can't do this with a simple Length check.
+            # submission time.
             EqualTo('password', message='Passwords must match.'),
         ],
         render_kw={'required': True, 'placeholder': 'Repeat your password'},

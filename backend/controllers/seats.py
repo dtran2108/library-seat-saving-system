@@ -6,7 +6,7 @@ def get_zones_with_seats():
     result = []
     for zone in zones:
         seats = query_db(
-            'SELECT seatId, destNo, status FROM seats WHERE zoneId = ? ORDER BY destNo',
+            'SELECT seatId, deskNo, status FROM seats WHERE zoneId = ? ORDER BY deskNo',
             (zone['zoneId'],),
         )
         # Convert sqlite3.Row objects to plain dicts so Jinja2 templates can
@@ -58,20 +58,20 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
     # Atomic update: only succeeds if no one else claimed the seat between the
     # read above and now. rowcount == 0 means another request won the race.
     cur = db.execute(
-        "UPDATE seats SET status = 'booked' WHERE seatId = ? AND status = 'available'",
+        "UPDATE seats SET status = 'occupied' WHERE seatId = ? AND status = 'available'",
         (seat_id,)
     )
     if cur.rowcount == 0:
         return False, 'This seat was just taken. Please choose another.'
 
     db.execute(
-        'INSERT INTO reservations (uId, seatId, startTime, endTime, status) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO reservations (userId, seatId, startTime, endTime, status) VALUES (?, ?, ?, ?, ?)',
         (
             user_id,
             seat_id,
             start_dt.strftime('%Y-%m-%d %H:%M:%S'),
             end_dt.strftime('%Y-%m-%d %H:%M:%S'),
-            'active',
+            'upcoming',
         )
     )
     db.commit()
