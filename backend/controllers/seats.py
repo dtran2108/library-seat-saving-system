@@ -181,7 +181,7 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
     try:
         start_dt = _parse_booking_datetime(booking_date, start_time)
     except ValueError:
-        return False, 'Invalid date or time format
+        return False, 'Invalid date or time format'
 
     end_dt = start_dt + timedelta(hours=duration)
     
