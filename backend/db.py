@@ -53,4 +53,5 @@ def init_db():
         path = os.path.join(current_app.root_path, filename)
         with open(path) as f:
             db.executescript(f.read())
+    db.commit()
 
