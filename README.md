@@ -473,7 +473,7 @@ def cancel_booking(user_id, reservation_id):
     # Rule 1: does this reservation exist and belong to this user?
     reservation = query_db(
         'SELECT reservationId, seatId, status FROM reservations '
-        'WHERE reservationId = ? AND userId = ?',
+        'WHERE reservationId = ? AND uId = ?',
         (reservation_id, user_id),
         one=True
     )
@@ -618,7 +618,7 @@ def get_user_bookings(user_id):
         '''SELECT r.reservationId, r.startTime, r.endTime, r.status, s.deskNo
            FROM reservations r
            JOIN seats s ON r.seatId = s.seatId
-           WHERE r.userId = ? AND r.status IN ('upcoming', 'active')
+           WHERE r.uId = ? AND r.status IN ('upcoming', 'active')
            ORDER BY r.startTime''',
         (user_id,)
     )
