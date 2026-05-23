@@ -173,7 +173,7 @@ def _get_user_daily_hours(user_id, booking_date):
         """
         SELECT startTime, endTime
         FROM reservations
-        WHERE userId = ?
+        WHERE uId = ?
         AND status IN ('upcoming', 'active')
         AND startTime >= ?
         AND startTime <= ?
@@ -247,7 +247,7 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
         """
         SELECT reservationId
         FROM reservations
-        WHERE userId = ?
+        WHERE uId = ?
         AND status IN ('upcoming', 'active')
         AND startTime < ?
         AND endTime > ?
@@ -263,7 +263,7 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
 
     db.execute(
         """
-        INSERT INTO reservations (userId, seatId, startTime, endTime, status)
+        INSERT INTO reservations (uId, seatId, startTime, endTime, status)
         VALUES (?, ?, ?, ?, ?)
         """,
         (
@@ -282,7 +282,7 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
             (seat_id,)
         )
         db.execute(
-            "UPDATE reservations SET status = 'active' WHERE userId = ? AND seatId = ? AND startTime = ?",
+            "UPDATE reservations SET status = 'active' WHERE uId = ? AND seatId = ? AND startTime = ?",
             (user_id, seat_id, start_text)
         )
 
@@ -297,7 +297,7 @@ def get_user_reservations(user_id):
         """
         SELECT
             r.reservationId,
-            r.userId,
+            r.uId,
             r.seatId,
             r.startTime,
             r.endTime,
@@ -308,7 +308,7 @@ def get_user_reservations(user_id):
         FROM reservations r
         JOIN seats s ON r.seatId = s.seatId
         JOIN zones z ON s.zoneId = z.zoneId
-        WHERE r.userId = ?
+        WHERE r.uId = ?
         ORDER BY r.startTime DESC
         """,
         (user_id,)
@@ -320,7 +320,7 @@ def get_user_reservations(user_id):
 def cancel_reservation(reservation_id, user_id, is_admin=False):
     reservation = query_db(
         """
-        SELECT reservationId, userId, seatId, status
+        SELECT reservationId, uId, seatId, status
         FROM reservations
         WHERE reservationId = ?
         """,
@@ -334,7 +334,7 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
     if reservation['status'] not in ('upcoming', 'active'):
         return False, 'Only upcoming or active reservations can be cancelled.'
 
-    if not is_admin and reservation['userId'] != user_id:
+    if not is_admin and reservation['uId'] != user_id:
         return False, 'You can only cancel your own reservation.'
 
     db = get_db()
