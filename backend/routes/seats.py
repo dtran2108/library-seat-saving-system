@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from flask import Blueprint, render_template, request, jsonify, session
 from decorators import login_required
 from controllers.seats import (
@@ -11,6 +11,21 @@ from controllers.seats import (
 )
 
 seats_bp = Blueprint('seats', __name__)
+
+DB_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+ACTIVE_STATUSES = ('upcoming', 'active')
+HISTORY_STATUSES = ('completed', 'cancelled', 'no_show')
+
+
+def _decorate_reservation(row):
+    start = datetime.strptime(row['startTime'], DB_DATETIME_FORMAT)
+    end = datetime.strptime(row['endTime'], DB_DATETIME_FORMAT)
+    row['booking_date'] = start.strftime('%A, %B %d, %Y')
+    row['start_time'] = start.strftime('%H:%M')
+    row['end_time'] = end.strftime('%H:%M')
+    row['seat_label'] = f"{row['zoneName']} · {row['deskNo']}"
+    return row
+
 
 @seats_bp.route('/dashboard', methods=['GET', 'POST'])
 @login_required
@@ -29,7 +44,14 @@ def seat_map():
 @seats_bp.route('/my-bookings')
 @login_required
 def my_bookings():
-    return render_template("dashboard/my-bookings.html")
+    reservations = [_decorate_reservation(r) for r in get_user_reservations(session['user_id'])]
+    upcoming = [r for r in reservations if r['status'] in ACTIVE_STATUSES]
+    history = [r for r in reservations if r['status'] in HISTORY_STATUSES]
+    return render_template(
+        "dashboard/my-bookings.html",
+        upcoming_bookings=upcoming,
+        history_bookings=history,
+    )
 
 
 @seats_bp.route('/api/book', methods=['POST'])
