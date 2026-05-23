@@ -7,16 +7,12 @@
 -- Layout reference:
 --   Learning Plaza A   : 7 cols → 7 rows × 7 seats each  (49 seats/zone)
 --   Learning Plaza B   : 8 cols → 6 rows × 8 seats each  (48 seats/zone)
---   Computer Area      : 3 cols → 2 rows × 3 seats        (6 seats)
---   Quiet Study Room   : 4 cols → 1 row  × 4 seats        (4 seats)
---   Total              : 4 zones, 115 seats
+--   Total              : 2 zones, 97 seats
 
 -- ── Zones ─────────────────────────────────────────────────────────────────
 INSERT OR IGNORE INTO zones (zoneId, name,               location,    cols, status) VALUES
     (1, 'Learning Plaza A', '1st Floor',  7, 'active'),
-    (2, 'Learning Plaza B', '1st Floor',  8, 'active'),
-    (3, 'Computer Area',    '4th Floor',  3, 'active'),
-    (4, 'Quiet Study Room', '3rd Floor',  4, 'active');
+    (2, 'Learning Plaza B', '1st Floor',  8, 'active');
 
 -- ── Seats: Learning Plaza A — 49 seats ─────────────────────────────────────
 INSERT OR IGNORE INTO seats (seatId, zoneId, deskNo,  status) VALUES
@@ -121,18 +117,3 @@ INSERT OR IGNORE INTO seats (seatId, zoneId, deskNo,  status) VALUES
     (96, 2, 'B-47', 'available'),
     (97, 2, 'B-48', 'available');
 
--- ── Seats: Computer Area — 6 seats ────────────────────────────────────────
-INSERT OR IGNORE INTO seats (seatId, zoneId, deskNo,  status) VALUES
-    (98, 3, 'C-01', 'available'),
-    (99, 3, 'C-02', 'available'),
-    (100, 3, 'C-03', 'occupied'),
-    (101, 3, 'C-04', 'available'),
-    (102, 3, 'C-05', 'blocked'),
-    (103, 3, 'C-06', 'available');
-
--- ── Seats: Quiet Study Room — 4 seats ─────────────────────────────────────
-INSERT OR IGNORE INTO seats (seatId, zoneId, deskNo,  status) VALUES
-    (104, 4, 'Q-01', 'available'),
-    (105, 4, 'Q-02', 'available'),
-    (106, 4, 'Q-03', 'available'),
-    (107, 4, 'Q-04', 'available');
