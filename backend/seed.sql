@@ -5,14 +5,14 @@
 -- exist (matched on PK) are silently skipped.
 --
 -- Layout reference:
---   Learning Plaza A   : 7 cols → 7 rows × 7 seats each  (49 seats/zone)
---   Learning Plaza B   : 8 cols → 6 rows × 8 seats each  (48 seats/zone)
+--   Learning Plaza A   : 10 cols → 4 rows × 10 + 1 row × 9  (49 seats/zone)
+--   Learning Plaza B   : 12 cols → 4 rows × 12 seats each  (48 seats/zone)
 --   Total              : 2 zones, 97 seats
 
 -- ── Zones ─────────────────────────────────────────────────────────────────
 INSERT OR IGNORE INTO zones (zoneId, name,               location,    cols, status) VALUES
-    (1, 'Learning Plaza A', '1st Floor',  7, 'active'),
-    (2, 'Learning Plaza B', '1st Floor',  8, 'active');
+    (1, 'Learning Plaza A', '1st Floor',  10, 'active'),
+    (2, 'Learning Plaza B', '1st Floor',  12, 'active');
 
 -- ── Seats: Learning Plaza A — 49 seats ─────────────────────────────────────
 INSERT OR IGNORE INTO seats (seatId, zoneId, deskNo,  status) VALUES
