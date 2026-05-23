@@ -168,15 +168,15 @@
                                 {# Seat buttons for this row #}
                                 <div class="flex gap-2">
                                 {% for seat in row_seats %}
-                                    {% if seat.status == 'booked' %}
+                                    {% if seat.status == 'occupied' %}
                                         {% set cls = "bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75" %}
-                                    {% elif seat.status == 'maintenance' %}
+                                    {% elif seat.status == 'blocked' %}
                                         {% set cls = "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60" %}
                                     {% else %}
                                         {% set cls = "bg-green-50 border-green-300 text-green-700 hover:scale-105 hover:shadow-sm cursor-pointer" %}
                                     {% endif %}
 
-                                    {% set seat_label = zone.name ~ ' · ' ~ seat.destNo %}
+                                    {% set seat_label = zone.name ~ ' · ' ~ seat.deskNo %}
 
                                     <button
                                         type="button"
@@ -190,7 +190,7 @@
                                             disabled
                                         {% endif %}
                                     >
-                                        {{ seat.destNo }}
+                                        {{ seat.deskNo }}
                                     </button>
                                 {% endfor %}
                                 </div>

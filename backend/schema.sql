@@ -1,21 +1,27 @@
 -- schema.sql — DDL for the Library Seat Saving System.
---
--- Contains only structure: CREATE TABLE and CREATE TRIGGER statements.
--- Seed data lives in seed.sql.
--- Both files are executed by init_db() in db.py on every server start.
--- IF NOT EXISTS / DROP-free DDL makes this safe to re-run on an existing DB.
 
 PRAGMA foreign_keys = ON;
 
 -- ─────────────────────────────────────────────────────────────
+-- Clean slate — drop in reverse FK order so dependents go first.
+-- ─────────────────────────────────────────────────────────────
+DROP TRIGGER IF EXISTS auto_release_seat;
+DROP TABLE   IF EXISTS admin_action_logs;
+DROP TABLE   IF EXISTS penalties;
+DROP TABLE   IF EXISTS check_in_logs;
+DROP TABLE   IF EXISTS reservations;
+DROP TABLE   IF EXISTS seats;
+DROP TABLE   IF EXISTS zones;
+DROP TABLE   IF EXISTS users;
+
+-- ─────────────────────────────────────────────────────────────
 -- User
--- Attributes: uId (PK), uname, phoneNo, password, role, ustatus
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
-    uId      TEXT PRIMARY KEY,                          -- Student ID (e.g. "B123456789")
+    uId      TEXT PRIMARY KEY,
     uname    TEXT NOT NULL,
     phoneNo  TEXT,
-    password TEXT NOT NULL,                             -- Werkzeug-hashed
+    password TEXT NOT NULL,
     role     TEXT NOT NULL DEFAULT 'user'
                  CHECK (role IN ('user', 'admin')),
     ustatus  TEXT NOT NULL DEFAULT 'active'
@@ -23,102 +29,102 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- Zone  (normalized from Seat.location / Seat.zone)
--- Represents a named physical area inside the library.
+-- Zone
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS zones (
     zoneId   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name     TEXT    NOT NULL,                          -- e.g. 'Learning Plaza A'
-    location TEXT    NOT NULL,                          -- e.g. '2nd Floor, North Wing'
-    cols     INTEGER NOT NULL DEFAULT 4,                -- seats per row in the physical grid
+    name     TEXT    NOT NULL,
+    location TEXT    NOT NULL,
+    cols     INTEGER NOT NULL DEFAULT 4,
     status   TEXT    NOT NULL DEFAULT 'active'
                  CHECK (status IN ('active', 'maintenance'))
 );
 
 -- ─────────────────────────────────────────────────────────────
 -- Seat
--- Attributes: seatId (PK), zoneId (FK→zones), destNo, status
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS seats (
     seatId INTEGER PRIMARY KEY AUTOINCREMENT,
     zoneId INTEGER NOT NULL,
-    destNo TEXT    NOT NULL,                            -- Desk label within zone, e.g. 'A-01'
+    deskNo TEXT    NOT NULL,
     status TEXT    NOT NULL DEFAULT 'available'
-               CHECK (status IN ('available', 'booked', 'maintenance')),
+               CHECK (status IN ('available', 'occupied', 'blocked')),
     FOREIGN KEY (zoneId) REFERENCES zones(zoneId)
 );
 
 -- ─────────────────────────────────────────────────────────────
 -- Reservation
--- Relationships: User -Makes-> Reservation (1:N)
---                Seat -Reserves-> Reservation (1:N)
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS reservations (
-    reservationId INTEGER PRIMARY KEY AUTOINCREMENT,
-    uId           TEXT     NOT NULL,
+    reservationId INTEGER  PRIMARY KEY AUTOINCREMENT,
+    userId        TEXT     NOT NULL,
     seatId        INTEGER  NOT NULL,
     startTime     DATETIME NOT NULL,
     endTime       DATETIME NOT NULL,
-    status        TEXT     NOT NULL DEFAULT 'active'
-                      CHECK (status IN ('active', 'cancelled', 'completed', 'no_show')),
+    status        TEXT     NOT NULL DEFAULT 'upcoming'
+                      CHECK (status IN ('upcoming', 'active', 'completed', 'cancelled', 'no_show')),
     createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (uId)    REFERENCES users(uId),
+    FOREIGN KEY (userId) REFERENCES users(uId),
     FOREIGN KEY (seatId) REFERENCES seats(seatId)
 );
 
 -- ─────────────────────────────────────────────────────────────
--- CheckInLog  (weak entity — double rectangle in ER diagram)
--- Relationship: Reservation -TrackedBy-> CheckInLog (1:1)
+-- CheckInLog
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS check_in_logs (
-    checkInId     INTEGER PRIMARY KEY AUTOINCREMENT,
-    reservationId INTEGER NOT NULL UNIQUE,
+    checkInId     INTEGER  PRIMARY KEY AUTOINCREMENT,
+    reservationId INTEGER  NOT NULL UNIQUE,
     checkInTime   DATETIME,
     checkOutTime  DATETIME,
-    status        TEXT NOT NULL DEFAULT 'pending'
-                      CHECK (status IN ('pending', 'checked_in', 'checked_out', 'no_show')),
+    status        TEXT     NOT NULL DEFAULT 'checked_in'
+                      CHECK (status IN ('checked_in', 'checked_out', 'missed')),
     FOREIGN KEY (reservationId) REFERENCES reservations(reservationId)
 );
 
 -- ─────────────────────────────────────────────────────────────
 -- Penalty
--- Relationship: User -Receives-> Penalty (1:N)
+-- reservationId is nullable: an admin may issue a manual penalty not tied
+-- to a specific reservation.
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS penalties (
-    penaltyId INTEGER PRIMARY KEY AUTOINCREMENT,
-    uId       TEXT NOT NULL,
-    reason    TEXT NOT NULL,
-    startDate DATE NOT NULL,
-    endDate   DATE NOT NULL,
-    status    TEXT NOT NULL DEFAULT 'active'
-                  CHECK (status IN ('active', 'expired')),
-    FOREIGN KEY (uId) REFERENCES users(uId)
+    penaltyId     INTEGER PRIMARY KEY AUTOINCREMENT,
+    reservationId INTEGER,
+    reason        TEXT    NOT NULL,
+    startDate     DATE    NOT NULL,
+    endDate       DATE    NOT NULL,
+    status        TEXT    NOT NULL DEFAULT 'active'
+                      CHECK (status IN ('active', 'expired', 'revoked')),
+    FOREIGN KEY (reservationId) REFERENCES reservations(reservationId)
 );
 
 -- ─────────────────────────────────────────────────────────────
 -- AdminActionLog
--- Relationships: User(admin) -Performs-> AdminActionLog (1:N)
---                Penalty -ResultsIn-> AdminActionLog (1:1, optional)
+-- seatId and penaltyId are both nullable because each actionType targets
+-- a different entity (block_seat → seatId; issue_penalty → penaltyId; etc.).
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS admin_action_logs (
-    actionId   INTEGER PRIMARY KEY AUTOINCREMENT,
-    uId        TEXT     NOT NULL,
-    actionType TEXT     NOT NULL,
-    timeStamp  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    targetId   TEXT     NOT NULL,
+    actionId   INTEGER  PRIMARY KEY AUTOINCREMENT,
+    userId     TEXT     NOT NULL,
+    seatId     INTEGER,
     penaltyId  INTEGER,
-    FOREIGN KEY (uId)       REFERENCES users(uId),
+    actionType TEXT     NOT NULL
+                   CHECK (actionType IN (
+                       'block_seat', 'unblock_seat', 'cancel_reservation',
+                       'issue_penalty', 'revoke_penalty',
+                       'suspend_user', 'reactivate_user'
+                   )),
+    timeStamp  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId)    REFERENCES users(uId),
+    FOREIGN KEY (seatId)    REFERENCES seats(seatId),
     FOREIGN KEY (penaltyId) REFERENCES penalties(penaltyId)
 );
 
 -- ─────────────────────────────────────────────────────────────
--- Trigger: auto-release seat on no-show
--- Fires when a check_in_log row is updated to status = 'no_show'.
--- Marks the linked reservation no_show and frees the seat.
+-- Trigger: auto-release seat on missed check-in
 -- ─────────────────────────────────────────────────────────────
 CREATE TRIGGER IF NOT EXISTS auto_release_seat
 AFTER UPDATE OF status ON check_in_logs
-WHEN NEW.status = 'no_show'
+WHEN NEW.status = 'missed'
 BEGIN
     UPDATE reservations
     SET    status = 'no_show'
