@@ -128,42 +128,33 @@
                 {% else %}
                     <div class="px-6 pb-6">
 
-                        {# Entrance marker #}
-                        <div class="flex justify-center mb-5">
-                            <div class="flex items-center gap-2 px-5 py-1.5 rounded-lg
-                                        border border-dashed border-muted-foreground/40
-                                        text-xs text-muted-foreground select-none">
-                                {# left arrow #}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2.5"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="m15 18-6-6 6-6"/>
-                                </svg>
-                                Entrance / Exit
-                                {# right arrow #}
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2.5"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="m9 18 6-6-6-6"/>
-                                </svg>
-                            </div>
+                        {# Plaza floor plan image — for Learning Plaza A & B #}
+                        {% if zone.name == 'Learning Plaza A' %}
+                        <div class="plaza-image-container relative mb-6 inline-block w-full">
+                            <img 
+                                src="{{ url_for('static', filename='plazaA.jpg') }}" 
+                                alt="Learning Plaza A Floor Plan"
+                                class="w-full h-auto rounded-lg border border-border shadow-sm"
+                            />
                         </div>
+                        {% elif zone.name == 'Learning Plaza B' %}
+                        <div class="plaza-image-container relative mb-6 inline-block w-full">
+                            <img 
+                                src="{{ url_for('static', filename='plazaB.jpg') }}" 
+                                alt="Learning Plaza B Floor Plan"
+                                class="w-full h-auto rounded-lg border border-border shadow-sm"
+                            />
+                        </div>
+                        {% endif %}
 
                         {# Seat grid — one flex row per physical row #}
                         {# zone.cols drives how many seats appear side-by-side. #}
-                        {# Row number and seats are separated by a labelled left gutter. #}
                         {% set cols = zone.cols %}
                         {% set total = zone.seats | length %}
                         <div class="flex flex-col gap-2.5 overflow-x-auto">
                         {% for row_start in range(0, total, cols) %}
                             {% set row_seats = zone.seats[row_start : row_start + cols] %}
                             <div class="flex items-center gap-3 min-w-fit">
-
-                                {# Row label #}
-                                <span class="w-12 shrink-0 text-right text-xs font-medium
-                                             text-muted-foreground select-none">
-                                    Row {{ loop.index }}
-                                </span>
 
                                 {# Seat buttons for this row #}
                                 <div class="flex gap-2">
@@ -200,25 +191,11 @@
                             {# Aisle gap after every 2 rows (if more rows follow) #}
                             {% if loop.index is divisibleby 2 and not loop.last %}
                                 <div class="flex items-center gap-3">
-                                    <span class="w-12 shrink-0"></span>
-                                    <div class="flex-1 border-t border-dashed border-muted-foreground/25 relative">
-                                        <span class="absolute left-1/2 -translate-x-1/2 -translate-y-1/2
-                                                     bg-card px-2 text-xs text-muted-foreground/50 select-none">
-                                            aisle
-                                        </span>
-                                    </div>
+                                    <div class="flex-1 border-t border-dashed border-muted-foreground/25"></div>
                                 </div>
                             {% endif %}
 
                         {% endfor %}
-                        </div>
-
-                        {# Back wall #}
-                        <div class="flex items-center gap-3 mt-5">
-                            <span class="w-12 shrink-0"></span>
-                            <div class="flex-1 h-px bg-foreground/15 rounded-full"></div>
-                            <span class="text-xs text-muted-foreground/40 select-none">wall</span>
-                            <div class="flex-1 h-px bg-foreground/15 rounded-full"></div>
                         </div>
 
                     </div>
