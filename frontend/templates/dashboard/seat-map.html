@@ -128,12 +128,20 @@
                 {% else %}
                     <div class="px-6 pb-6">
 
-                        {# Plaza floor plan image — only for Learning Plaza A #}
+                        {# Plaza floor plan image — for Learning Plaza A & B #}
                         {% if zone.name == 'Learning Plaza A' %}
                         <div class="plaza-image-container relative mb-6 inline-block w-full">
                             <img 
                                 src="{{ url_for('static', filename='plazaA.jpg') }}" 
                                 alt="Learning Plaza A Floor Plan"
+                                class="w-full h-auto rounded-lg border border-border shadow-sm"
+                            />
+                        </div>
+                        {% elif zone.name == 'Learning Plaza B' %}
+                        <div class="plaza-image-container relative mb-6 inline-block w-full">
+                            <img 
+                                src="{{ url_for('static', filename='plazaB.jpg') }}" 
+                                alt="Learning Plaza B Floor Plan"
                                 class="w-full h-auto rounded-lg border border-border shadow-sm"
                             />
                         </div>
