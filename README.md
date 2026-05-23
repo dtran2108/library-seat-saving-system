@@ -221,7 +221,7 @@ The database file (`backend/library.db`) is created automatically when the serve
 
 ### Starter data
 
-`seed.sql` pre-loads four zones (Learning Plaza A/B, Computer Area, Quiet Study Room) and 26 seats with `INSERT OR IGNORE`, so the seed data only inserts once and is never duplicated on restart.
+`seed.sql` pre-loads two zones (Learning Plaza A, Learning Plaza B) and 97 seats with `INSERT OR IGNORE`, so the seed data only inserts once and is never duplicated on restart.
 
 ### Creating an admin account
 

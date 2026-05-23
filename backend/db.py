@@ -57,7 +57,7 @@ def init_db():
     # schema.sql must run first — seed.sql depends on the tables existing.
     for filename in ('schema.sql', 'seed.sql'):
         path = os.path.join(current_app.root_path, filename)
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             db.executescript(f.read())
     db.commit()
 
