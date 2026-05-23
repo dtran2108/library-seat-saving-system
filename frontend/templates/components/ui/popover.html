@@ -1,0 +1,126 @@
+{#
+    Popover — a ShadcnUI-style floating panel anchored to a trigger element.
+
+    Vanilla-JS port of the Radix/Shadcn popover. Differences from upstream:
+      - No Portal: the popover lives wherever the macro is called, but is
+        positioned with `position: fixed` so it escapes clipping containers.
+      - No `tailwindcss-animate`: uses the same scale/opacity transition as
+        the project's Dialog macro to stay consistent with the rest of the UI.
+      - No floating-ui: placement is computed once on open from the trigger's
+        bounding rect, with viewport clamping + auto-flip above when there
+        isn't room below.
+
+    Usage (define the popover body via `caller()`):
+        {% from "components/ui/popover.html" import Popover %}
+        {% call Popover(id="my-popover") %}
+            <p>Anything goes here.</p>
+        {% endcall %}
+
+    Then in JS:
+        openPopover('my-popover', triggerElement)
+        closePopover('my-popover')
+
+    The popover auto-dismisses on Escape and on outside click.
+#}
+
+{% macro Popover(id, width_class="w-64") %}
+<div
+    id="{{ id }}"
+    role="dialog"
+    aria-hidden="true"
+    data-state="closed"
+    class="hidden fixed z-50 {{ width_class }}"
+>
+    <div
+        id="{{ id }}-panel"
+        class="bg-card text-foreground border border-border rounded-xl shadow-lg p-4
+               transform transition-all duration-150 ease-out scale-95 opacity-0"
+    >
+        {{ caller() }}
+    </div>
+</div>
+
+<script>
+    if (typeof openPopover === 'undefined') {
+        // Track dismiss handlers per popover so close() can detach them.
+        const _popoverHandlers = new Map();
+
+        function openPopover(id, triggerEl) {
+            const root  = document.getElementById(id);
+            const panel = document.getElementById(id + '-panel');
+            if (!root || !panel || !triggerEl) return;
+
+            // Show off-screen first so we can measure the panel's size.
+            root.style.left = '0px';
+            root.style.top  = '-9999px';
+            root.classList.remove('hidden');
+
+            const rect    = triggerEl.getBoundingClientRect();
+            const popRect = root.getBoundingClientRect();
+            const gap     = 8;
+            const margin  = 8;
+
+            // Default: centered horizontally on the trigger, below it.
+            let left = rect.left + rect.width / 2 - popRect.width / 2;
+            let top  = rect.bottom + gap;
+
+            // Clamp horizontally inside the viewport.
+            left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
+
+            // Flip above the trigger if it would overflow the bottom.
+            if (top + popRect.height + margin > window.innerHeight) {
+                top = Math.max(margin, rect.top - popRect.height - gap);
+            }
+
+            root.style.left = left + 'px';
+            root.style.top  = top + 'px';
+            root.setAttribute('data-state', 'open');
+            root.setAttribute('aria-hidden', 'false');
+
+            requestAnimationFrame(() => {
+                panel.classList.remove('scale-95', 'opacity-0');
+                panel.classList.add('scale-100', 'opacity-100');
+            });
+
+            // Dismiss on outside click / Escape. Defer the click listener by one
+            // tick so the originating click doesn't immediately close the popover.
+            const onDocClick = (e) => {
+                if (root.contains(e.target) || triggerEl.contains(e.target)) return;
+                closePopover(id);
+            };
+            const onKey = (e) => {
+                if (e.key === 'Escape') closePopover(id);
+            };
+            setTimeout(() => document.addEventListener('click', onDocClick), 0);
+            document.addEventListener('keydown', onKey);
+            _popoverHandlers.set(id, { onDocClick, onKey });
+        }
+
+        function closePopover(id) {
+            const root  = document.getElementById(id);
+            const panel = document.getElementById(id + '-panel');
+            if (!root || !panel) return;
+
+            panel.classList.remove('scale-100', 'opacity-100');
+            panel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                root.classList.add('hidden');
+                root.setAttribute('data-state', 'closed');
+                root.setAttribute('aria-hidden', 'true');
+            }, 150);
+
+            const h = _popoverHandlers.get(id);
+            if (h) {
+                document.removeEventListener('click', h.onDocClick);
+                document.removeEventListener('keydown', h.onKey);
+                _popoverHandlers.delete(id);
+            }
+        }
+
+        function isPopoverOpen(id) {
+            const root = document.getElementById(id);
+            return !!root && root.getAttribute('data-state') === 'open';
+        }
+    }
+</script>
+{% endmacro %}

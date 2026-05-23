@@ -30,7 +30,10 @@ def _decorate_reservation(row):
 @seats_bp.route('/dashboard', methods=['GET', 'POST'])
 @login_required
 def user_dashboard():
-    return render_template("dashboard/user-dashboard.html")
+    reservations = [_decorate_reservation(r) for r in get_user_reservations(session['user_id'])]
+    upcoming = [r for r in reservations if r['status'] in ACTIVE_STATUSES]
+    upcoming.sort(key=lambda r: r['startTime'])
+    return render_template("dashboard/user-dashboard.html", upcoming_bookings=upcoming)
 
 
 @seats_bp.route('/seat-map')
