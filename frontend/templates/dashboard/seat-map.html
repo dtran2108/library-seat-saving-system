@@ -9,7 +9,8 @@
 {% set time_slots = [
     '08:00', '09:00', '10:00', '11:00', '12:00',
     '13:00', '14:00', '15:00', '16:00', '17:00',
-    '18:00', '19:00', '20:00'
+    '18:00', '19:00', '20:00', '21:00', '22:00',
+    '23:00' 
 ] %}
 
 {% block content %}
@@ -17,7 +18,6 @@
 
     {{ PageHeader("Seat Map", "Pick a date and time — green seats are free for that window.", icon="map") }}
 
-    {# ── Find-a-seat bar: drives the whole grid ──────────────────────────── #}
     <div class="bg-card border border-border rounded-2xl p-4 mb-5">
         <div class="flex flex-wrap items-end gap-4">
 
@@ -41,15 +41,6 @@
             <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-foreground">Duration:</label>
                 <div class="flex gap-1" id="duration-btns">
-                    {% for d in [1, 2, 3, 4] %}
-                        <button
-                            type="button"
-                            data-duration="{{ d }}"
-                            class="duration-btn px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors {{ 'border-primary bg-primary/10 text-primary' if d == 1 else 'border-border text-muted-foreground hover:border-primary/50' }}"
-                        >
-                            {{ d }}h
-                        </button>
-                    {% endfor %}
                 </div>
             </div>
 
@@ -57,10 +48,8 @@
         </div>
     </div>
 
-    {# ── Filter + Search Bar ──────────────────────────────────────────── #}
     <div class="bg-card border border-border rounded-2xl p-4 mb-5">
 
-        {# Text search #}
         <div class="relative mb-3">
             <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-muted-foreground"
@@ -80,7 +69,6 @@
             />
         </div>
 
-        {# Zone quick-filter pills #}
         <div class="flex flex-wrap gap-2">
             <button
                 data-pill="all"
@@ -103,7 +91,6 @@
         </div>
     </div>
 
-    {# ── Legend ───────────────────────────────────────────────────────── #}
     <div class="flex flex-wrap gap-4 mb-5">
         <div class="flex items-center gap-1.5">
             <div class="w-5 h-5 rounded border-2 bg-green-50 border-green-300"></div>
@@ -115,11 +102,10 @@
         </div>
         <div class="flex items-center gap-1.5">
             <div class="w-5 h-5 rounded border-2 bg-gray-100 border-gray-300"></div>
-            <span class="text-xs text-muted-foreground">Blocked</span>
+            <span class="text-xs text-muted-foreground">Blocked / Past Time</span>
         </div>
     </div>
 
-    {# ── Zone Cards ───────────────────────────────────────────────────── #}
     {% if not zones %}
         <div class="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">
             No zones are configured yet.
@@ -128,7 +114,6 @@
         <div class="flex flex-col gap-5" id="zone-list">
         {% for zone in zones %}
 
-            {# data-zone-name is lowercased for JS substring matching #}
             <div
                 class="zone-card bg-card border border-border rounded-2xl overflow-hidden"
                 data-zone-id="{{ zone.zoneId }}"
@@ -137,7 +122,6 @@
                 data-zone-status="{{ zone.zone_status }}"
             >
 
-                {# ── Zone Header ──────────────────────────────────────── #}
                 <div class="flex items-start justify-between gap-3 px-6 pt-5 pb-4">
                     <div>
                         <h3 class="font-semibold text-foreground">{{ zone.name }}</h3>
@@ -160,7 +144,6 @@
                     {% endif %}
                 </div>
 
-                {# ── Floor Plan ───────────────────────────────────────── #}
                 {% if zone.zone_status == 'maintenance' %}
                     <div class="px-6 pb-6 text-center text-sm text-muted-foreground py-8">
                         This area is temporarily closed.
@@ -186,7 +169,6 @@
                         </div>
                         {% endif %}
 
-                        {# Seat grid — one flex row per physical row #}
                         {% set cols = zone.cols %}
                         {% set total = zone.seats | length %}
                         <div class="flex flex-col gap-2.5 overflow-x-auto">
@@ -238,11 +220,9 @@
     {% endif %}
 </div>
 
-{# Booking confirmation modal #}
 {{ BookingModal() }}
 
 <script>
-    // ── State ────────────────────────────────────────────────────────────
     const SEAT_CLS = {
         available: 'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-green-50 border-green-300 text-green-700 hover:scale-105 hover:shadow-sm cursor-pointer',
         reserved:  'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75',
@@ -252,9 +232,10 @@
 
     let selectedDuration = 1;
     let activePill = 'all';
-    let fetchSeq = 0;  // guards against out-of-order responses
+    let fetchSeq = 0;  
 
-    // ── Window helpers ───────────────────────────────────────────────────
+    const MAX_END_HOUR = 24; 
+
     function getWindow() {
         return {
             date:     document.getElementById('booking-date').value,
@@ -269,21 +250,84 @@
         return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
     }
 
+    function checkIfPastTime(w) {
+        const now = new Date();
+        const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        const currentTimeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+        if (w.date < todayStr) {
+            return true;
+        }
+        if (w.date === todayStr && w.start < currentTimeStr) {
+            return true;
+        }
+        return false;
+    }
+
     function updateWindowSummary() {
         const w = getWindow();
         const end = addHours(w.start, w.duration);
-        document.getElementById('window-summary').textContent =
-            `Showing seats free between ${w.start} – ${end}`;
+        const summaryEl = document.getElementById('window-summary');
+        
+        if (checkIfPastTime(w)) {
+            summaryEl.innerHTML = `<span class="text-red-500 font-semibold">⚠️ Cannot book a past time!</span>`;
+        } else {
+            summaryEl.textContent = `Showing seats free between ${w.start} – ${end}`;
+        }
     }
 
-    // ── Availability fetch + recolor ─────────────────────────────────────
+    function renderDurationButtons() {
+        const startValue = document.getElementById('booking-start').value;
+        if (!startValue) return;
+
+        const startHour = parseInt(startValue.split(':')[0], 10);
+        const maxAvailableHours = Math.min(4, MAX_END_HOUR - startHour);
+
+        if (selectedDuration > maxAvailableHours) {
+            selectedDuration = Math.max(1, maxAvailableHours);
+        }
+
+        const btnContainer = document.getElementById('duration-btns');
+        btnContainer.innerHTML = ''; 
+
+        for (let d = 1; d <= maxAvailableHours; d++) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.duration = d;
+            btn.textContent = `${d}h`;
+            
+            const isActive = d === selectedDuration;
+            btn.className = 'duration-btn px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors '
+                + (isActive ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:border-primary/50');
+
+            btn.addEventListener('click', () => {
+                selectedDuration = d;
+                document.querySelectorAll('.duration-btn').forEach(b => {
+                    const active = Number(b.dataset.duration) === selectedDuration;
+                    b.className = 'duration-btn px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors '
+                        + (active ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-muted-foreground hover:border-primary/50');
+                });
+                refreshAvailability();
+            });
+
+            btnContainer.appendChild(btn);
+        }
+    }
+
     async function refreshAvailability() {
         const w = getWindow();
         if (!w.date || !w.start) return;
 
         updateWindowSummary();
 
-        // Paint a loading state so users know we're refreshing.
+        if (checkIfPastTime(w)) {
+            applySeatStyles(new Set());
+            updateZoneCounts(new Set());
+            return;
+        }
+
         document.querySelectorAll('.seat-btn').forEach(btn => {
             if (btn.dataset.blocked === 'true') return;
             btn.className = SEAT_CLS.loading;
@@ -302,7 +346,7 @@
         try {
             const res  = await fetch('/api/available?' + params.toString());
             const data = await res.json();
-            if (seq !== fetchSeq) return;  // a newer request superseded this one
+            if (seq !== fetchSeq) return;  
             if (data.success) {
                 availableIds = new Set(data.seats.map(s => s.seatId));
             } else {
@@ -318,6 +362,9 @@
     }
 
     function applySeatStyles(availableIds) {
+        const w = getWindow();
+        const isPastTime = checkIfPastTime(w);
+
         document.querySelectorAll('.seat-btn').forEach(btn => {
             const seatId = Number(btn.dataset.seatId);
             const blocked = btn.dataset.blocked === 'true';
@@ -326,6 +373,15 @@
                 btn.className = SEAT_CLS.blocked;
                 btn.disabled = true;
                 btn.onclick = null;
+                btn.title = "Blocked";
+                return;
+            }
+
+            if (isPastTime) {
+                btn.className = SEAT_CLS.blocked;
+                btn.disabled = true;
+                btn.onclick = null;
+                btn.title = "Cannot book a past time";
                 return;
             }
 
@@ -334,15 +390,20 @@
                 btn.disabled = false;
                 const label = btn.dataset.seatLabel || ('Seat ' + seatId);
                 btn.onclick = () => openBookingModal(seatId, label);
+                btn.title = label;
             } else {
                 btn.className = SEAT_CLS.reserved;
                 btn.disabled = true;
                 btn.onclick = null;
+                btn.title = "Reserved";
             }
         });
     }
 
     function updateZoneCounts(availableIds) {
+        const w = getWindow();
+        const isPastTime = checkIfPastTime(w);
+
         document.querySelectorAll('.zone-card').forEach(card => {
             const zoneStatus = card.dataset.zoneStatus;
             const zoneId = card.dataset.zoneId;
@@ -352,15 +413,20 @@
 
             if (zoneStatus === 'maintenance') return;
 
-            const seats = card.querySelectorAll('.seat-btn');
             let avail = 0;
-            seats.forEach(btn => {
-                const sid = Number(btn.dataset.seatId);
-                if (btn.dataset.blocked !== 'true' && availableIds.has(sid)) avail++;
-            });
+            if (!isPastTime) {
+                const seats = card.querySelectorAll('.seat-btn');
+                seats.forEach(btn => {
+                    const sid = Number(btn.dataset.seatId);
+                    if (btn.dataset.blocked !== 'true' && availableIds.has(sid)) avail++;
+                });
+            }
 
             if (badge) {
-                if (avail === 0) {
+                if (isPastTime) {
+                    badge.className = 'shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-500';
+                    badge.textContent = `Expired Time`;
+                } else if (avail === 0) {
                     badge.className = 'shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-700';
                     badge.textContent = `Full · 0 / ${total}`;
                 } else {
@@ -368,49 +434,35 @@
                     badge.textContent = `${avail} / ${total} available`;
                 }
             }
-            if (pill) pill.textContent = `${avail}/${total}`;
+            if (pill) pill.textContent = isPastTime ? `0/${total}` : `${avail}/${total}`;
         });
     }
 
-    // Called by the booking modal after a successful booking.
     function onSeatBooked() {
         refreshAvailability();
     }
 
-    // ── Top-bar control bindings ─────────────────────────────────────────
     document.getElementById('booking-date').addEventListener('change', refreshAvailability);
-    document.getElementById('booking-start').addEventListener('change', refreshAvailability);
-
-    document.querySelectorAll('.duration-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            selectedDuration = Number(btn.dataset.duration);
-            document.querySelectorAll('.duration-btn').forEach(b => {
-                const isActive = Number(b.dataset.duration) === selectedDuration;
-                b.className = 'duration-btn px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors '
-                    + (isActive ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border text-muted-foreground hover:border-primary/50');
-            });
-            refreshAvailability();
-        });
+    
+    document.getElementById('booking-start').addEventListener('change', () => {
+        renderDurationButtons();
+        refreshAvailability();
     });
 
-    // ── Default start_time: next round hour, clamped to 08:00–20:00 ──────
     (function setDefaultStart() {
         const sel = document.getElementById('booking-start');
         const slots = Array.from(sel.options).map(o => o.value);
         const now = new Date();
         let candidate = String(now.getHours() + (now.getMinutes() > 0 ? 1 : 0)).padStart(2, '0') + ':00';
         if (!slots.includes(candidate)) {
-            // Pick the first slot ≥ candidate, or fall back to the earliest slot.
             candidate = slots.find(s => s >= candidate) || slots[0];
         }
         sel.value = candidate;
     })();
 
-    // Initial paint
+    renderDurationButtons();
     refreshAvailability();
 
-    // ── Zone search + pill filter (unchanged behavior) ───────────────────
     function setPill(value) {
         activePill = value;
         const searchEl = document.getElementById('zone-search');
@@ -460,5 +512,4 @@
         });
     }
 </script>
-
 {% endblock %}
