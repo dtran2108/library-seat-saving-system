@@ -4,272 +4,690 @@
 {% from "components/ui/icon.html" import Icon %}
 {% from "components/ui/button.html" import Button %}
 {% from "components/ui/page-header.html" import PageHeader %}
-{% from "components/stat-card.html" import StatCard, EmptyState %}
 {% from "components/ui/date-picker.html" import DatePicker %}
+{% from "components/ui/popover.html" import Popover %}
+{% from "components/ui/dialog.html" import Dialog %}
+{% from "components/ui/alert-dialog.html" import AlertDialog %}
+{% from "components/ui/tabs.html" import Tabs %}
+{% from "components/stat-card.html" import StatCard, EmptyState %}
+{% from "components/ui/badge.html" import Badge %}
+
+
+{# ─────────────────────────────────────────────────────────────────────
+   Local macros
+   ───────────────────────────────────────────────────────────────────── #}
+
+{# A single booking row in the Bookings tab. #}
+{% macro BookingRow(b) %}
+    <div id="booking-row-{{ b.reservationId }}" class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-2 flex-wrap">
+                {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
+                <span class="font-semibold text-foreground">{{ b.seat_label }}</span>
+                {{ Badge(b.status) }}
+            </div>
+            <p class="text-sm text-muted-foreground ml-6">
+                {{ b.user_label }}
+            </p>
+            <p class="text-sm text-muted-foreground ml-6">
+                {{ b.start_time }} – {{ b.end_time }}
+            </p>
+        </div>
+
+        {% if b.status in ('upcoming', 'active') %}
+            <div class="flex gap-2 shrink-0">
+                <button
+                    type="button"
+                    data-override-id="{{ b.reservationId }}"
+                    data-seat-label="{{ b.seat_label }}"
+                    data-user-label="{{ b.user_label }}"
+                    data-booking-date="{{ b.booking_date }}"
+                    data-start-time="{{ b.start_time }}"
+                    data-duration="{{ b.duration }}"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-primary/30 bg-transparent shadow-sm hover:bg-primary/5 text-primary h-8 px-3"
+                >
+                    {{ Icon('clock', class="w-4 h-4 mr-1") }}
+                    Override Time
+                </button>
+                <button
+                    type="button"
+                    data-cancel-id="{{ b.reservationId }}"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-destructive/30 bg-transparent shadow-sm hover:bg-destructive/5 text-destructive h-8 px-3"
+                >
+                    {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
+                    Cancel
+                </button>
+            </div>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+
+{# One zone block in the Manage Seats tab — header + seat-button grid. #}
+{% macro ZoneSection(zone) %}
+    <div>
+        <div class="flex items-center justify-between mb-2">
+            <div>
+                <p class="text-sm font-semibold text-foreground">{{ zone.name }}</p>
+                <p class="text-xs text-muted-foreground">{{ zone.location }}</p>
+            </div>
+            {% if zone.zone_status == 'maintenance' %}
+                <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Zone closed</span>
+            {% endif %}
+        </div>
+
+        {# Plaza floor plan image — for Learning Plaza A & B #}
+        {% if zone.name == 'Learning Plaza A' %}
+            <div class="mb-3">
+                <img
+                    src="{{ url_for('static', filename='plazaA.jpg') }}"
+                    alt="Learning Plaza A Floor Plan"
+                    class="w-full h-auto rounded-lg border border-border shadow-sm"
+                />
+            </div>
+        {% elif zone.name == 'Learning Plaza B' %}
+            <div class="mb-3">
+                <img
+                    src="{{ url_for('static', filename='plazaB.jpg') }}"
+                    alt="Learning Plaza B Floor Plan"
+                    class="w-full h-auto rounded-lg border border-border shadow-sm"
+                />
+            </div>
+        {% endif %}
+
+        <div class="flex flex-wrap gap-2">
+            {% for seat in zone.seats %}
+                {% set status_class = "bg-amber-50 border-amber-400 text-amber-700" if seat.status == 'blocked' else "bg-green-50 border-green-300 text-green-700" %}
+                {# data-number carries the full label for the popover #}
+                <button
+                    type="button"
+                    class="seat-btn w-12 h-12 rounded-xl border-2 text-xs font-semibold transition-all duration-150 hover:scale-105 {{ status_class }}"
+                    data-id="{{ seat.seatId }}"
+                    data-number="{{ zone.name }} · {{ seat.deskNo }}"
+                    data-status="{{ seat.status }}"
+                    onclick="openSeatPopover(this)"
+                >
+                    {{ seat.deskNo }}
+                </button>
+            {% endfor %}
+        </div>
+    </div>
+{% endmacro %}
+
 
 {% block title %}Admin Dashboard{% endblock %}
 
 {% block content %}
 
-    {# --- MOCK DATA (bookings only — seats come from the route) --- #}
-    {% set selected_date = "2026-05-10" %}
-    {%
-        set bookings = [
-            {'id': 1, 'seat_number': 'A-04', 'user_email': 'student@nsysu.edu.tw', 'start_time': '08:00', 'end_time': '12:00', 'status': 'confirmed', 'override_by_admin': False},
-            {'id': 2, 'seat_number': 'B-03', 'user_email': 'test@student.tw',       'start_time': '13:00', 'end_time': '15:00', 'status': 'cancelled', 'override_by_admin': True}
-        ]
-    %}
-    {# ----------------------------------------------------------------- #}
+    {% set active_bookings = bookings | selectattr("status", "in", ["upcoming", "active"]) | list | length %}
 
     <div class="p-6 max-w-5xl mx-auto">
         {{ PageHeader("Admin Panel", "Manage bookings and seats.", icon="settings") }}
 
+        {# ── Stat cards ───────────────────────────────────────────────── #}
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
             {{ StatCard("Total Seats", total_seats) }}
-            {{ StatCard("Blocked Seats", blocked_seats, color="text-amber-600") }}
-
-            {% set active_bookings = bookings | selectattr("status", "equalto", "confirmed") | list | length %}
-            {{ StatCard("Bookings on " ~ selected_date, active_bookings, color="text-primary") }}
+            {{ StatCard("Blocked Seats", blocked_seats, color="text-amber-600", value_id="blocked-seats-count") }}
+            {{ StatCard("Bookings on " ~ selected_date, active_bookings, color="text-primary", value_id="bookings-on-date-count") }}
         </div>
 
-        <div class="flex gap-1 bg-muted rounded-xl p-1 w-fit mb-5">
-            <button
-                onclick="switchTab('bookings')"
-                id="tab-btn-bookings"
-                class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-card text-foreground shadow-sm"
-            >
-                Bookings
-            </button>
-            <button
-                onclick="switchTab('seats')"
-                id="tab-btn-seats"
-                class="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
-            >
-                Manage Seats
-            </button>
-        </div>
+        {# ── Tabs ────────────────────────────────────────────────────── #}
+        {% call(tab) Tabs(
+            tabs=["bookings", "seats"],
+            labels={"bookings": "Bookings", "seats": "Manage Seats"},
+            default="bookings",
+            id="admin-tabs"
+        ) %}
 
-        <div id="tab-content-bookings" class="block">
-            {{ DatePicker(value=selected_date, wrapper_class="mb-4") }}
+            {% if tab == "bookings" %}
+                {{ DatePicker(id="bookings-date", value=selected_date, wrapper_class="mb-4") }}
 
-            {% if not bookings %}
-                {{ EmptyState("No bookings on this date.") }}
-            {% else %}
-                <div class="flex flex-col gap-3">
-                    {% for b in bookings %}
-                        <div
-                            class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-                        >
-                            <div>
-                                <p class="font-semibold text-foreground">
-                                    Seat {{ b.seat_number }} — {{ b.user_email }}
-                                </p>
-                                <p class="text-sm text-muted-foreground">
-                                    {{ b.start_time }} – {{ b.end_time }} · Status:
-                                    <span class="capitalize">{{ b.status }}</span>
-                                </p>
-                                {% if b.override_by_admin %}
-                                    <span class="text-xs font-medium text-amber-600"
-                                        >Admin override</span
-                                    >
-                                {% endif %}
-                            </div>
-
-                            {% if b.status == "confirmed" %}
-                                <form action="#" method="POST" class="shrink-0">
-                                    <input type="hidden" name="booking_id" value="{{ b.id }}" />
-                                    {% call Button(variant="outline", size="sm", class="text-destructive border-destructive/30 hover:bg-destructive/5") %}
-                                        {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
-                                        Override & Cancel
-                                    {% endcall %}
-                                </form>
-                            {% endif %}
+                <div id="bookings-list">
+                    {% if not bookings %}
+                        {{ EmptyState("No bookings on this date.") }}
+                    {% else %}
+                        <div class="flex flex-col gap-3">
+                            {% for b in bookings %}
+                                {{ BookingRow(b) }}
+                            {% endfor %}
                         </div>
-                    {% endfor %}
+                    {% endif %}
+                </div>
+
+                <template id="booking-row-template">
+                    <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
+                                <span class="font-semibold text-foreground" data-slot="seat-label"></span>
+                                <span data-slot="status-badge" class="px-2 py-0.5 rounded-full text-xs font-medium capitalize"></span>
+                            </div>
+                            <p class="text-sm text-muted-foreground ml-6" data-slot="user-label"></p>
+                            <p class="text-sm text-muted-foreground ml-6" data-slot="time-range"></p>
+                        </div>
+                        <div class="flex gap-2 shrink-0" data-slot="actions">
+                            <button
+                                type="button"
+                                data-slot="override-btn"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-primary/30 bg-transparent shadow-sm hover:bg-primary/5 text-primary h-8 px-3"
+                            >
+                                {{ Icon('clock', class="w-4 h-4 mr-1") }}
+                                Override Time
+                            </button>
+                            <button
+                                type="button"
+                                data-slot="cancel-btn"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-destructive/30 bg-transparent shadow-sm hover:bg-destructive/5 text-destructive h-8 px-3"
+                            >
+                                {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+            {% elif tab == "seats" %}
+                <div class="bg-card border border-border rounded-2xl p-6">
+                    {# Legend #}
+                    <div class="flex gap-4 mb-5 text-xs font-medium text-foreground">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-4 h-4 rounded bg-green-50 border-2 border-green-300 inline-block"></span>
+                            Available
+                        </span>
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-4 h-4 rounded bg-amber-50 border-2 border-amber-400 inline-block"></span>
+                            Blocked
+                        </span>
+                    </div>
+                    <p class="text-xs text-muted-foreground mb-4">Click a seat to block or unblock it.</p>
+
+                    {% if not zones %}
+                        <p class="text-sm text-muted-foreground text-center py-6">No zones configured yet.</p>
+                    {% else %}
+                        <div class="flex flex-col gap-6">
+                            {% for zone in zones %}
+                                {{ ZoneSection(zone) }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
             {% endif %}
-        </div>
 
-        <div id="tab-content-seats" class="hidden">
-            <div class="bg-card border border-border rounded-2xl p-6">
-                {# Legend #}
-                <div class="flex gap-4 mb-5 text-xs font-medium text-foreground">
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-4 h-4 rounded bg-green-50 border-2 border-green-300 inline-block"></span>
-                        Available
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-4 h-4 rounded bg-amber-50 border-2 border-amber-400 inline-block"></span>
-                        Blocked
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <span class="w-4 h-4 rounded bg-primary/20 border-2 border-primary inline-block"></span>
-                        Selected
-                    </span>
-                </div>
-
-                {# One section per zone #}
-                {% if not zones %}
-                    <p class="text-sm text-muted-foreground text-center py-6">No zones configured yet.</p>
-                {% else %}
-                    <div class="flex flex-col gap-6">
-                    {% for zone in zones %}
-                        <div>
-                            {# Zone header #}
-                            <div class="flex items-center justify-between mb-2">
-                                <div>
-                                    <p class="text-sm font-semibold text-foreground">{{ zone.name }}</p>
-                                    <p class="text-xs text-muted-foreground">{{ zone.location }}</p>
-                                </div>
-                                {% if zone.zone_status == 'maintenance' %}
-                                    <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Zone closed</span>
-                                {% endif %}
-                            </div>
-
-                            {# Seat buttons #}
-                            <div class="flex flex-wrap gap-2">
-                                {% for seat in zone.seats %}
-                                    {% if seat.status == 'blocked' %}
-                                        {% set status_class = "bg-amber-50 border-amber-400 text-amber-700" %}
-                                    {% else %}
-                                        {% set status_class = "bg-green-50 border-green-300 text-green-700" %}
-                                    {% endif %}
-
-                                    {# data-number carries the full label for the action panel #}
-                                    <button
-                                        type="button"
-                                        class="seat-btn w-12 h-12 rounded-xl border-2 text-xs font-semibold transition-all duration-150 hover:scale-105 {{ status_class }}"
-                                        data-id="{{ seat.seatId }}"
-                                        data-number="{{ zone.name }} · {{ seat.deskNo }}"
-                                        data-status="{{ seat.status }}"
-                                        onclick="selectSeat(this)"
-                                    >
-                                        {{ seat.deskNo }}
-                                    </button>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% endfor %}
-                    </div>
-                {% endif %}
-
-                <div
-                    id="seat-action-panel"
-                    class="hidden mt-6 border-t border-border pt-4 items-center justify-between gap-3 flex-wrap"
-                >
-                    <div>
-                        <p class="font-semibold text-foreground" id="panel-seat-name">Seat --</p>
-                        <p class="text-sm text-muted-foreground capitalize" id="panel-seat-status">
-                            Status: --
-                        </p>
-                    </div>
-
-                    <form action="#" method="POST" id="seat-action-form">
-                        <input type="hidden" name="seat_id" id="panel-seat-id" value="" />
-
-                        <div id="panel-button-container"></div>
-                    </form>
-                </div>
-            </div>
-        </div>
+        {% endcall %}
     </div>
 
+    {# ── Override-reservation dialog ──────────────────────────────────── #}
+    {% set override_time_slots = [
+        '08:00', '09:00', '10:00', '11:00', '12:00',
+        '13:00', '14:00', '15:00', '16:00', '17:00',
+        '18:00', '19:00', '20:00'
+    ] %}
+    {% call Dialog(id="override-dialog", title="Override Reservation Time") %}
+        <div class="flex flex-col gap-1 bg-secondary rounded-xl px-3 py-2 mb-4 text-sm">
+            <div class="flex items-center gap-2">
+                {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
+                <span class="font-semibold text-foreground" id="override-seat-label">Seat --</span>
+            </div>
+            <p class="text-muted-foreground ml-6" id="override-user-label">--</p>
+            <p class="text-muted-foreground ml-6" id="override-current-time">Current: --</p>
+            <p class="text-muted-foreground ml-6" id="override-date-display">--</p>
+        </div>
+
+        <form id="override-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+            <div class="mb-4">
+                <label class="text-sm font-medium text-foreground block mb-2">New duration (hours)</label>
+                <div class="flex gap-2" id="override-duration-btns">
+                    {% for d in [1, 2, 3, 4] %}
+                        <button
+                            type="button"
+                            data-duration="{{ d }}"
+                            class="flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors border-border text-muted-foreground hover:border-primary/50"
+                        >
+                            {{ d }}h
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="mb-5">
+                <label class="text-sm font-medium text-foreground mb-2 flex items-center gap-1">
+                    {{ Icon('clock', class="w-4 h-4") }} New start time
+                </label>
+                <div class="grid grid-cols-4 gap-1.5 max-h-44 overflow-y-auto mt-2" id="override-time-grid">
+                    {% for slot in override_time_slots %}
+                        <button
+                            type="button"
+                            data-slot="{{ slot }}"
+                            class="py-1.5 rounded-lg text-xs font-medium border transition-colors bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground"
+                        >
+                            {{ slot }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="override-summary" class="hidden bg-accent/50 rounded-xl px-3 py-2 mb-4 text-sm text-accent-foreground">
+                New time: <strong id="override-summary-start">--</strong> → <strong id="override-summary-end">--</strong>
+                (<span id="override-summary-duration">1</span>h)
+            </div>
+
+            <div id="override-error" class="hidden mb-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2"></div>
+
+            <button
+                type="submit"
+                id="override-submit"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 w-full"
+            >
+                Apply Override
+            </button>
+        </form>
+    {% endcall %}
+
+    {# ── Cancel confirmation alert dialog ────────────────────────────── #}
+    {{ AlertDialog(
+        id="cancel-alert",
+        title="Cancel this reservation?",
+        description="This will free the seat and notify the user. This action cannot be undone.",
+        confirm_label="Cancel reservation",
+        cancel_label="Keep it",
+        confirm_onclick="confirmCancelBooking()",
+    ) }}
+
+    {# ── Seat action popover ─────────────────────────────────────────── #}
+    {# Lives outside the tab panels so it's always reachable from JS, even
+       though it's only triggered from the seats tab.                     #}
+    {% call Popover(id="seat-popover", width_class="w-56") %}
+        <div class="mb-3">
+            <p class="font-semibold text-foreground text-sm" id="seat-popover-name">Seat --</p>
+            <p class="text-xs text-muted-foreground capitalize" id="seat-popover-status">Status: --</p>
+        </div>
+        <form method="POST" id="seat-popover-form" onsubmit="return submitSeatAction(event)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="seat_id" id="seat-popover-seat-id" value="" />
+            <button
+                type="submit"
+                id="seat-popover-action"
+                data-action="block"
+                class="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-9 px-4 py-2 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
+            >
+                <span data-icon="block">{{ Icon('lock', class="w-4 h-4") }}</span>
+                <span data-icon="unblock" class="hidden">{{ Icon('unlock', class="w-4 h-4") }}</span>
+                <span id="seat-popover-action-label">Block Seat</span>
+            </button>
+        </form>
+    {% endcall %}
+
     <script>
-        // Tab Switching Logic
-        function switchTab(tabName) {
-            // Toggle Content Visibility
-            document
-                .getElementById("tab-content-bookings")
-                .classList.toggle("hidden", tabName !== "bookings");
-            document
-                .getElementById("tab-content-bookings")
-                .classList.toggle("block", tabName === "bookings");
+        // ── Seat button palettes (restored after a status change) ────────
+        const SEAT_AVAILABLE_CLASS = "bg-green-50 border-green-300 text-green-700".split(" ");
+        const SEAT_BLOCKED_CLASS   = "bg-amber-50 border-amber-400 text-amber-700".split(" ");
 
-            document
-                .getElementById("tab-content-seats")
-                .classList.toggle("hidden", tabName !== "seats");
-            document
-                .getElementById("tab-content-seats")
-                .classList.toggle("block", tabName === "seats");
+        // ── Popover action-button palettes ───────────────────────────────
+        const ACTION_BLOCK_CLASS   = "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90".split(" ");
+        const ACTION_UNBLOCK_CLASS = "border border-green-400 bg-transparent text-green-700 shadow-sm hover:bg-green-50".split(" ");
 
-            // Toggle Button Styles
-            const btnBookings = document.getElementById("tab-btn-bookings");
-            const btnSeats = document.getElementById("tab-btn-seats");
-            const activeClass = ["bg-card", "text-foreground", "shadow-sm"];
-            const inactiveClass = ["text-muted-foreground", "hover:text-foreground"];
+        // The seat the popover is currently anchored to.
+        let activeSeatBtn = null;
 
-            if (tabName === "bookings") {
-                btnBookings.classList.add(...activeClass);
-                btnBookings.classList.remove(...inactiveClass);
-                btnSeats.classList.remove(...activeClass);
-                btnSeats.classList.add(...inactiveClass);
-            } else {
-                btnSeats.classList.add(...activeClass);
-                btnSeats.classList.remove(...inactiveClass);
-                btnBookings.classList.remove(...activeClass);
-                btnBookings.classList.add(...inactiveClass);
+        // ── Open the popover anchored to a clicked seat ──────────────────
+        function openSeatPopover(seatBtn) {
+            // Clicking the same seat twice closes the popover.
+            if (activeSeatBtn === seatBtn && isPopoverOpen("seat-popover")) {
+                closePopover("seat-popover");
+                activeSeatBtn = null;
+                return;
+            }
+            activeSeatBtn = seatBtn;
+
+            const isBlocked = seatBtn.getAttribute("data-status") === "blocked";
+
+            document.getElementById("seat-popover-name").textContent   = seatBtn.getAttribute("data-number");
+            document.getElementById("seat-popover-status").textContent = "Status: " + seatBtn.getAttribute("data-status");
+            document.getElementById("seat-popover-seat-id").value      = seatBtn.getAttribute("data-id");
+
+            setPopoverActionMode(isBlocked ? "unblock" : "block");
+            openPopover("seat-popover", seatBtn);
+        }
+
+        // ── Configure the popover's action button for block vs. unblock ──
+        function setPopoverActionMode(mode) {
+            const actionBtn = document.getElementById("seat-popover-action");
+            const isUnblock = mode === "unblock";
+
+            actionBtn.disabled = false;
+            actionBtn.dataset.action = mode;
+
+            actionBtn.classList.remove(...ACTION_BLOCK_CLASS, ...ACTION_UNBLOCK_CLASS);
+            actionBtn.classList.add(...(isUnblock ? ACTION_UNBLOCK_CLASS : ACTION_BLOCK_CLASS));
+
+            document.querySelector('[data-icon="block"]').classList.toggle("hidden", isUnblock);
+            document.querySelector('[data-icon="unblock"]').classList.toggle("hidden", !isUnblock);
+            document.getElementById("seat-popover-action-label").textContent =
+                isUnblock ? "Unblock Seat" : "Block Seat";
+        }
+
+        // ── Submit Block / Unblock via fetch ─────────────────────────────
+        async function submitSeatAction(event) {
+            event.preventDefault();
+            const form      = event.target;
+            const submitBtn = document.getElementById("seat-popover-action");
+            const isUnblock = submitBtn.dataset.action === "unblock";
+            const endpoint  = isUnblock ? "/api/admin/unblock-seat" : "/api/admin/block-seat";
+
+            submitBtn.disabled = true;
+
+            try {
+                const res  = await fetch(endpoint, { method: "POST", body: new FormData(form) });
+                const data = await res.json();
+
+                if (data.success) {
+                    onSeatStatusChanged(activeSeatBtn, isUnblock ? "available" : "blocked");
+                    closePopover("seat-popover");
+                    activeSeatBtn = null;
+                    if (typeof showToast === "function") showToast(data.message, "success");
+                } else {
+                    if (typeof showToast === "function") {
+                        showToast(data.error || "Action failed.", "error");
+                    }
+                    submitBtn.disabled = false;
+                }
+            } catch {
+                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
+                submitBtn.disabled = false;
+            }
+            return false;
+        }
+
+        // ── Bookings tab: load by date, render rows, open override dialog ─
+        const BADGE_STYLES = {
+            upcoming:  "bg-secondary text-secondary-foreground",
+            active:    "bg-green-100 text-green-700",
+            completed: "bg-gray-100 text-gray-500",
+            cancelled: "bg-red-100 text-red-600",
+            no_show:   "bg-red-100 text-red-600",
+        };
+
+        function renderBookings(bookings) {
+            const list = document.getElementById("bookings-list");
+            if (!list) return;
+
+            if (!bookings.length) {
+                list.innerHTML = '<div class="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">No bookings on this date.</div>';
+                updateBookingsStat(0);
+                return;
+            }
+
+            const tpl = document.getElementById("booking-row-template");
+            const wrap = document.createElement("div");
+            wrap.className = "flex flex-col gap-3";
+
+            for (const b of bookings) {
+                const node = tpl.content.firstElementChild.cloneNode(true);
+                node.id = `booking-row-${b.reservationId}`;
+                node.querySelector('[data-slot="seat-label"]').textContent = b.seat_label;
+                node.querySelector('[data-slot="user-label"]').textContent = b.user_label;
+                node.querySelector('[data-slot="time-range"]').textContent = `${b.start_time} – ${b.end_time}`;
+
+                const badge = node.querySelector('[data-slot="status-badge"]');
+                badge.textContent = b.status;
+                badge.className = `px-2 py-0.5 rounded-full text-xs font-medium capitalize ${BADGE_STYLES[b.status] || BADGE_STYLES.upcoming}`;
+
+                const overrideBtn = node.querySelector('[data-slot="override-btn"]');
+                const cancelBtn   = node.querySelector('[data-slot="cancel-btn"]');
+                const actions     = node.querySelector('[data-slot="actions"]');
+                if (b.status === "upcoming" || b.status === "active") {
+                    overrideBtn.dataset.overrideId  = b.reservationId;
+                    overrideBtn.dataset.seatLabel   = b.seat_label;
+                    overrideBtn.dataset.userLabel   = b.user_label;
+                    overrideBtn.dataset.bookingDate = b.booking_date;
+                    overrideBtn.dataset.startTime   = b.start_time;
+                    overrideBtn.dataset.duration    = b.duration;
+                    overrideBtn.addEventListener("click", () => openOverrideDialog(overrideBtn));
+
+                    cancelBtn.dataset.cancelId = b.reservationId;
+                    cancelBtn.addEventListener("click", () => cancelBooking(cancelBtn));
+                } else {
+                    actions.remove();
+                }
+
+                wrap.appendChild(node);
+            }
+
+            list.replaceChildren(wrap);
+            updateBookingsStat(bookings.filter(b => b.status === "upcoming" || b.status === "active").length);
+        }
+
+        function updateBookingsStat(n) {
+            const el = document.getElementById("bookings-on-date-count");
+            if (el) el.textContent = String(n);
+        }
+
+        // Tracks the reservation currently queued for the cancel alert dialog.
+        const cancelTarget = { btn: null };
+
+        function cancelBooking(btn) {
+            cancelTarget.btn = btn;
+            openAlertDialog("cancel-alert");
+        }
+
+        async function confirmCancelBooking() {
+            const btn = cancelTarget.btn;
+            if (!btn) return;
+            const id = btn.dataset.cancelId;
+            const confirmBtn = document.getElementById("cancel-alert-confirm");
+
+            btn.disabled = true;
+            if (confirmBtn) confirmBtn.disabled = true;
+
+            try {
+                const res = await fetch(`/api/admin/cancel-reservation/${id}`, {
+                    method: "POST",
+                    headers: { "X-CSRFToken": "{{ csrf_token() }}" },
+                });
+                const data = await res.json();
+                if (data.success) {
+                    if (typeof showToast === "function") showToast(data.message, "success");
+                    closeAlertDialog("cancel-alert");
+                    const di = document.getElementById("bookings-date");
+                    loadBookingsForDate(di ? di.value : "{{ selected_date }}");
+                } else {
+                    if (typeof showToast === "function") showToast(data.error || "Cancel failed.", "error");
+                    btn.disabled = false;
+                    closeAlertDialog("cancel-alert");
+                }
+            } catch {
+                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
+                btn.disabled = false;
+                closeAlertDialog("cancel-alert");
+            } finally {
+                if (confirmBtn) confirmBtn.disabled = false;
+                cancelTarget.btn = null;
             }
         }
 
-        // Seat Selection Logic
-        let currentSelectedBtn = null;
-        const defaultAvailableClass    = "bg-green-50 border-green-300 text-green-700".split(" ");
-        const defaultBlockedClass      = "bg-amber-50 border-amber-400 text-amber-700".split(" ");
-        const activeSeatClass          = "bg-primary/20 border-primary text-primary scale-105".split(" ");
+        async function loadBookingsForDate(dateStr) {
+            try {
+                const res = await fetch(`/api/admin/bookings?date=${encodeURIComponent(dateStr)}`);
+                const data = await res.json();
+                if (data.success) {
+                    renderBookings(data.bookings);
+                } else if (typeof showToast === "function") {
+                    showToast(data.error || "Failed to load bookings.", "error");
+                }
+            } catch {
+                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
+            }
+        }
 
-        function selectSeat(buttonElement) {
-            // Deselect previous seat
-            if (currentSelectedBtn) {
-                currentSelectedBtn.classList.remove(...activeSeatClass);
-                const prevStatus = currentSelectedBtn.getAttribute("data-status");
-                currentSelectedBtn.classList.add(
-                    ...(prevStatus === "blocked" ? defaultBlockedClass : defaultAvailableClass)
-                );
+        // ── Override dialog state ────────────────────────────────────────
+        const overrideState = {
+            reservationId: null,
+            duration: 1,
+            startTime: "",
+        };
 
-                // If clicking the same button twice, just close the panel
-                if (currentSelectedBtn === buttonElement) {
-                    document.getElementById("seat-action-panel").classList.add("hidden");
-                    document.getElementById("seat-action-panel").classList.remove("flex");
-                    currentSelectedBtn = null;
+        function addHours(time, hours) {
+            const [h, m] = time.split(":").map(Number);
+            const total  = h * 60 + m + hours * 60;
+            return String(Math.floor(total / 60)).padStart(2, "0") + ":" + String(total % 60).padStart(2, "0");
+        }
+
+        function formatDateDisplay(iso) {
+            if (!iso) return "--";
+            const [y, mo, d] = iso.split("-").map(Number);
+            const months = ["January","February","March","April","May","June",
+                            "July","August","September","October","November","December"];
+            return `${months[mo - 1]} ${d}, ${y}`;
+        }
+
+        function paintOverrideDuration() {
+            document.querySelectorAll('#override-duration-btns button').forEach(btn => {
+                const isActive = Number(btn.dataset.duration) === overrideState.duration;
+                btn.className = 'flex-1 py-2 rounded-xl text-sm font-medium border-2 transition-colors '
+                    + (isActive ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:border-primary/50');
+            });
+        }
+
+        function paintOverrideSlot() {
+            document.querySelectorAll('#override-time-grid button').forEach(btn => {
+                const isActive = btn.dataset.slot === overrideState.startTime;
+                btn.className = 'py-1.5 rounded-lg text-xs font-medium border transition-colors '
+                    + (isActive ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-card border-border hover:border-primary/60 hover:bg-secondary text-foreground');
+            });
+        }
+
+        function refreshOverrideSummary() {
+            const summary = document.getElementById('override-summary');
+            if (!overrideState.startTime) {
+                summary.classList.add('hidden');
+                return;
+            }
+            summary.classList.remove('hidden');
+            document.getElementById('override-summary-start').textContent    = overrideState.startTime;
+            document.getElementById('override-summary-end').textContent      = addHours(overrideState.startTime, overrideState.duration);
+            document.getElementById('override-summary-duration').textContent = overrideState.duration;
+        }
+
+        function openOverrideDialog(btn) {
+            overrideState.reservationId = btn.dataset.overrideId;
+            overrideState.duration      = Number(btn.dataset.duration) || 1;
+            overrideState.startTime     = btn.dataset.startTime || "";
+
+            document.getElementById('override-seat-label').textContent   = btn.dataset.seatLabel;
+            document.getElementById('override-user-label').textContent   = btn.dataset.userLabel;
+            document.getElementById('override-current-time').textContent =
+                `Current: ${btn.dataset.startTime} (${btn.dataset.duration}h)`;
+            document.getElementById('override-date-display').textContent = formatDateDisplay(btn.dataset.bookingDate);
+
+            const errorEl = document.getElementById('override-error');
+            errorEl.classList.add('hidden');
+            errorEl.textContent = '';
+
+            const submitBtn = document.getElementById('override-submit');
+            submitBtn.disabled    = false;
+            submitBtn.textContent = 'Apply Override';
+
+            paintOverrideDuration();
+            paintOverrideSlot();
+            refreshOverrideSummary();
+
+            openDialog('override-dialog');
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const dateInput = document.getElementById("bookings-date");
+            if (dateInput) {
+                dateInput.addEventListener("change", () => loadBookingsForDate(dateInput.value));
+            }
+            document.querySelectorAll('[data-override-id]').forEach(btn => {
+                btn.addEventListener("click", () => openOverrideDialog(btn));
+            });
+            document.querySelectorAll('[data-cancel-id]').forEach(btn => {
+                btn.addEventListener("click", () => cancelBooking(btn));
+            });
+
+            document.querySelectorAll('#override-duration-btns button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    overrideState.duration = Number(btn.dataset.duration);
+                    paintOverrideDuration();
+                    refreshOverrideSummary();
+                });
+            });
+
+            document.querySelectorAll('#override-time-grid button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    overrideState.startTime = btn.dataset.slot;
+                    paintOverrideSlot();
+                    refreshOverrideSummary();
+                });
+            });
+
+            document.getElementById('override-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const errorEl   = document.getElementById('override-error');
+                const submitBtn = document.getElementById('override-submit');
+                errorEl.classList.add('hidden');
+
+                if (!overrideState.startTime) {
+                    errorEl.textContent = 'Please select a new start time.';
+                    errorEl.classList.remove('hidden');
                     return;
                 }
+
+                submitBtn.disabled    = true;
+                submitBtn.textContent = 'Applying…';
+
+                try {
+                    const body = new FormData();
+                    body.append('start_time', overrideState.startTime);
+                    body.append('duration', String(overrideState.duration));
+                    body.append('csrf_token', '{{ csrf_token() }}');
+
+                    const res = await fetch(`/api/admin/override-reservation/${overrideState.reservationId}`, {
+                        method: 'POST',
+                        body,
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        closeDialog('override-dialog');
+                        if (typeof showToast === 'function') showToast(data.message, 'success');
+                        const di = document.getElementById('bookings-date');
+                        loadBookingsForDate(di ? di.value : "{{ selected_date }}");
+                    } else {
+                        errorEl.textContent = data.error || 'Override failed.';
+                        errorEl.classList.remove('hidden');
+                        submitBtn.disabled    = false;
+                        submitBtn.textContent = 'Apply Override';
+                    }
+                } catch {
+                    errorEl.textContent = 'Network error. Please try again.';
+                    errorEl.classList.remove('hidden');
+                    submitBtn.disabled    = false;
+                    submitBtn.textContent = 'Apply Override';
+                }
+            });
+        });
+
+        // ── Update seat button + Blocked Seats stat after a status change ─
+        function onSeatStatusChanged(btn, newStatus) {
+            if (!btn) return;
+            const wasBlocked = btn.getAttribute("data-status") === "blocked";
+            btn.setAttribute("data-status", newStatus);
+            btn.classList.remove(...SEAT_AVAILABLE_CLASS, ...SEAT_BLOCKED_CLASS);
+            btn.classList.add(...(newStatus === "blocked" ? SEAT_BLOCKED_CLASS : SEAT_AVAILABLE_CLASS));
+
+            const countEl = document.getElementById("blocked-seats-count");
+            if (countEl) {
+                const n = parseInt(countEl.textContent.trim(), 10);
+                if (!Number.isNaN(n)) {
+                    const delta = newStatus === "blocked" ? 1 : (wasBlocked ? -1 : 0);
+                    countEl.textContent = String(Math.max(0, n + delta));
+                }
             }
-
-            // Select new seat
-            currentSelectedBtn = buttonElement;
-            const status = buttonElement.getAttribute("data-status");
-
-            buttonElement.classList.remove(...defaultAvailableClass);
-            buttonElement.classList.remove(...defaultBlockedClass);
-            buttonElement.classList.add(...activeSeatClass);
-
-            // Update Panel Content
-            document.getElementById("panel-seat-name").textContent =
-                buttonElement.getAttribute("data-number");
-            document.getElementById("panel-seat-status").textContent = "Status: " + status;
-            document.getElementById("panel-seat-id").value = buttonElement.getAttribute("data-id");
-
-            // Inject appropriate button into the form
-            const btnContainer = document.getElementById("panel-button-container");
-            if (status === "blocked") {
-                btnContainer.innerHTML = `
-                <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-9 px-4 py-2 border border-green-400 bg-transparent text-green-700 shadow-sm hover:bg-green-50">
-                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-                    Unblock Seat
-                </button>
-            `;
-            } else {
-                btnContainer.innerHTML = `
-                <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-9 px-4 py-2 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90">
-                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    Block Seat
-                </button>
-            `;
-            }
-
-            // Show Panel
-            document.getElementById("seat-action-panel").classList.remove("hidden");
-            document.getElementById("seat-action-panel").classList.add("flex");
         }
     </script>
 {% endblock %}

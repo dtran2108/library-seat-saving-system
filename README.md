@@ -701,8 +701,8 @@ A living record of what is done and what still needs to be built. Update this as
 
 ### Student — Booking Management
 
-- [ ] View personal reservations — route and template exist (**shell only**, no DB query wired up)
-- [ ] Cancel an active reservation (frees the seat)
+- [x] View personal reservations — route and template exist (**shell only**, no DB query wired up)
+- [x] Cancel an active reservation (frees the seat)
 - [ ] Modify a reservation's time slot
 - [ ] Extend a reservation (if the seat is still available)
 - [ ] Check in to a reservation (creates a `check_in_logs` record)
@@ -720,10 +720,9 @@ A living record of what is done and what still needs to be built. Update this as
 ### Admin — Seat & Zone Management
 
 - [x] Admin dashboard — overview of all zones and aggregate seat stats (total, blocked)
-- [ ] Block a seat for maintenance (change status to `blocked`)
-- [ ] Unblock a seat (restore it to `available`)
-- [ ] View and override any active reservation
-- [ ] Enable or disable the booking system globally (e.g., for public holidays)
+- [x] Block a seat for maintenance (change status to `blocked`)
+- [x] Unblock a seat (restore it to `available`)
+- [x] View and override any active reservation
 
 ---
 
