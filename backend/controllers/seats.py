@@ -6,14 +6,22 @@ from db import query_db, get_db
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 INPUT_DATETIME_FORMAT = '%Y-%m-%d %H:%M'
 MAX_HOURS_PER_DAY = 4
+ALLOWED_DURATIONS = (1, 2, 3, 4)
+CHECK_IN_GRACE_MINUTES = 30
+LIVE_STATUSES = ('upcoming', 'active')
 
 
+# ─── Formatting helpers ──────────────────────────────────────────────────
 def _parse_booking_datetime(booking_date, start_time):
     return datetime.strptime(f'{booking_date} {start_time}', INPUT_DATETIME_FORMAT)
 
 
-def _format_datetime(dt):
+def _fmt(dt):
     return dt.strftime(DATETIME_FORMAT)
+
+
+def _now_text():
+    return _fmt(datetime.now())
 
 
 def _reservation_hours(row):
@@ -22,6 +30,96 @@ def _reservation_hours(row):
     return (end_dt - start_dt).total_seconds() / 3600
 
 
+# ─── Overlap / occupancy helpers ─────────────────────────────────────────
+def _seat_overlap_reservation_id(seat_id, start_text, end_text, exclude_id=None):
+    """Return the id of any upcoming/active reservation on this seat that
+    overlaps [start_text, end_text), or None if the seat is free."""
+    args = [seat_id, end_text, start_text]
+    exclude_clause = ''
+    if exclude_id is not None:
+        exclude_clause = 'AND reservationId != ?'
+        args.append(exclude_id)
+
+    row = query_db(
+        f"""
+        SELECT reservationId
+        FROM reservations
+        WHERE seatId = ?
+        AND status IN ('upcoming', 'active')
+        AND startTime < ?
+        AND endTime > ?
+        {exclude_clause}
+        """,
+        tuple(args),
+        one=True,
+    )
+    return row['reservationId'] if row else None
+
+
+def _user_overlap_reservation_id(user_id, start_text, end_text):
+    row = query_db(
+        """
+        SELECT reservationId
+        FROM reservations
+        WHERE uId = ?
+        AND status IN ('upcoming', 'active')
+        AND startTime < ?
+        AND endTime > ?
+        """,
+        (user_id, start_text, end_text),
+        one=True,
+    )
+    return row['reservationId'] if row else None
+
+
+def _seat_active_reservation_at(seat_id, when_text):
+    row = query_db(
+        """
+        SELECT reservationId
+        FROM reservations
+        WHERE seatId = ?
+        AND status = 'active'
+        AND startTime <= ?
+        AND endTime > ?
+        """,
+        (seat_id, when_text, when_text),
+        one=True,
+    )
+    return row['reservationId'] if row else None
+
+
+def _recompute_seat_status(seat_id, when_text=None):
+    """Set the seat to 'occupied' iff an active reservation covers `when_text`,
+    otherwise 'available'. Leaves blocked seats alone."""
+    when_text = when_text or _now_text()
+    new_status = 'occupied' if _seat_active_reservation_at(seat_id, when_text) else 'available'
+    get_db().execute(
+        "UPDATE seats SET status = ? WHERE seatId = ? AND status != 'blocked'",
+        (new_status, seat_id),
+    )
+
+
+# ─── Input validation ────────────────────────────────────────────────────
+def _validate_window(booking_date, start_time, duration):
+    """Parse (booking_date, start_time, duration) into datetimes. Returns
+    (start_dt, end_dt, duration_int) or raises ValueError with a user-facing
+    message."""
+    try:
+        duration = int(duration)
+    except (TypeError, ValueError):
+        raise ValueError('Invalid duration.')
+    if duration not in ALLOWED_DURATIONS:
+        raise ValueError(f'Duration must be between 1 and {MAX_HOURS_PER_DAY} hours.')
+
+    try:
+        start_dt = _parse_booking_datetime(booking_date, start_time)
+    except (TypeError, ValueError):
+        raise ValueError('Invalid date or time format.')
+
+    return start_dt, start_dt + timedelta(hours=duration), duration
+
+
+# ─── Zone listing ────────────────────────────────────────────────────────
 def get_zones_with_seats():
     zones = query_db('SELECT * FROM zones ORDER BY zoneId')
     result = []
@@ -31,9 +129,7 @@ def get_zones_with_seats():
             'SELECT seatId, deskNo, status FROM seats WHERE zoneId = ? ORDER BY deskNo',
             (zone['zoneId'],),
         )
-
         seat_list = [dict(s) for s in seats]
-
         result.append({
             'zoneId':      zone['zoneId'],
             'name':        zone['name'],
@@ -48,14 +144,11 @@ def get_zones_with_seats():
     return result
 
 
-def get_seat_map_data():
-    return get_zones_with_seats()
-
-
+# ─── State-sync sweeps ───────────────────────────────────────────────────
 def update_expired_reservations():
-    """Update reservation and seat statuses based on current time."""
-    now = datetime.now()
-    now_text = _format_datetime(now)
+    """Roll reservation statuses forward in time, then recompute seat
+    occupancy from the active reservation set."""
+    now_text = _now_text()
     db = get_db()
 
     db.execute(
@@ -65,23 +158,7 @@ def update_expired_reservations():
         WHERE status IN ('active', 'upcoming')
         AND endTime <= ?
         """,
-        (now_text,)
-    )
-
-    db.execute(
-        """
-        UPDATE seats
-        SET status = 'available'
-        WHERE status = 'occupied'
-        AND seatId NOT IN (
-            SELECT seatId
-            FROM reservations
-            WHERE status = 'active'
-            AND startTime <= ?
-            AND endTime > ?
-        )
-        """,
-        (now_text, now_text)
+        (now_text,),
     )
 
     db.execute(
@@ -92,53 +169,132 @@ def update_expired_reservations():
         AND startTime <= ?
         AND endTime > ?
         """,
-        (now_text, now_text)
+        (now_text, now_text),
     )
 
     db.execute(
         """
         UPDATE seats
-        SET status = 'occupied'
-        WHERE seatId IN (
-            SELECT seatId
-            FROM reservations
-            WHERE status = 'active'
-            AND startTime <= ?
-            AND endTime > ?
-        )
+        SET status = CASE
+            WHEN EXISTS (
+                SELECT 1 FROM reservations
+                WHERE seatId = seats.seatId
+                AND status = 'active'
+                AND startTime <= ?
+                AND endTime > ?
+            ) THEN 'occupied'
+            ELSE 'available'
+        END
+        WHERE status != 'blocked'
         """,
-        (now_text, now_text)
+        (now_text, now_text),
     )
 
     db.commit()
 
+    sweep_missed_check_ins()
 
+
+def sweep_missed_check_ins():
+    """Release seats whose user did not check in within the grace period.
+
+    Insert a placeholder check-in log row and update it to 'missed' so the
+    auto_release_seat trigger (schema.sql) cascades to no_show + seat release.
+    """
+    now = datetime.now()
+    cutoff_text = _fmt(now - timedelta(minutes=CHECK_IN_GRACE_MINUTES))
+    now_text = _fmt(now)
+
+    missed = query_db(
+        """
+        SELECT r.reservationId
+        FROM reservations r
+        LEFT JOIN check_in_logs c ON c.reservationId = r.reservationId
+        WHERE r.status IN ('upcoming', 'active')
+        AND r.startTime <= ?
+        AND r.endTime > ?
+        AND c.checkInId IS NULL
+        """,
+        (cutoff_text, now_text),
+    )
+
+    if not missed:
+        return
+
+    db = get_db()
+    for row in missed:
+        db.execute(
+            "INSERT INTO check_in_logs (reservationId, status) VALUES (?, 'checked_in')",
+            (row['reservationId'],),
+        )
+        db.execute(
+            "UPDATE check_in_logs SET status = 'missed' WHERE reservationId = ?",
+            (row['reservationId'],),
+        )
+    db.commit()
+
+
+def check_in_reservation(reservation_id, user_id):
+    """User checks in for their reservation. Returns (success, msg)."""
+    try:
+        reservation_id = int(reservation_id)
+    except (TypeError, ValueError):
+        return False, 'Invalid reservation ID.'
+
+    row = query_db(
+        """
+        SELECT r.uId, r.startTime, r.status, c.checkInId
+        FROM reservations r
+        LEFT JOIN check_in_logs c ON c.reservationId = r.reservationId
+        WHERE r.reservationId = ?
+        """,
+        (reservation_id,),
+        one=True,
+    )
+
+    if not row:
+        return False, 'Reservation not found.'
+    if row['uId'] != user_id:
+        return False, 'You can only check in to your own reservation.'
+    if row['checkInId'] is not None:
+        return False, 'You have already checked in for this reservation.'
+    if row['status'] != 'active':
+        return False, 'Check-in is only available for active reservations.'
+
+    now = datetime.now()
+    start_dt = datetime.strptime(row['startTime'], DATETIME_FORMAT)
+    if now > start_dt + timedelta(minutes=CHECK_IN_GRACE_MINUTES):
+        return False, 'The 30-minute check-in window has expired.'
+
+    get_db().execute(
+        """
+        INSERT INTO check_in_logs (reservationId, checkInTime, status)
+        VALUES (?, ?, 'checked_in')
+        """,
+        (reservation_id, _fmt(now)),
+    )
+    get_db().commit()
+    return True, 'Checked in successfully.'
+
+
+# ─── Availability + booking ──────────────────────────────────────────────
 def get_available_seats(booking_date, start_time, duration, zone_id=None):
     """Return seats available for the requested time range."""
     if not all([booking_date, start_time, duration]):
         return False, 'booking_date, start_time, and duration are required.'
 
     try:
-        duration = int(duration)
-        if duration < 1 or duration > MAX_HOURS_PER_DAY:
-            return False, f'Duration must be between 1 and {MAX_HOURS_PER_DAY} hours.'
-        start_dt = _parse_booking_datetime(booking_date, start_time)
-    except ValueError:
-        return False, 'Invalid date, time, or duration.'
+        start_dt, end_dt, _ = _validate_window(booking_date, start_time, duration)
+    except ValueError as e:
+        return False, str(e)
 
-    end_dt = start_dt + timedelta(hours=duration)
-    start_text = _format_datetime(start_dt)
-    end_text = _format_datetime(end_dt)
-
-    params = [end_text, start_text]
+    params = [_fmt(end_dt), _fmt(start_dt)]
     zone_filter = ''
-
     if zone_id:
         try:
             zone_id = int(zone_id)
-        except ValueError:
+        except (TypeError, ValueError):
             return False, 'Invalid zone ID.'
-
         zone_filter = 'AND s.zoneId = ?'
         params.append(zone_id)
 
@@ -149,65 +305,51 @@ def get_available_seats(booking_date, start_time, duration, zone_id=None):
         JOIN zones z ON s.zoneId = z.zoneId
         WHERE s.status != 'blocked'
         AND z.status != 'maintenance'
-        AND s.seatId NOT IN (
-            SELECT r.seatId
-            FROM reservations r
-            WHERE r.status IN ('upcoming', 'active')
+        AND NOT EXISTS (
+            SELECT 1 FROM reservations r
+            WHERE r.seatId = s.seatId
+            AND r.status IN ('upcoming', 'active')
             AND r.startTime < ?
             AND r.endTime > ?
         )
         {zone_filter}
         ORDER BY z.zoneId, s.deskNo
         """,
-        tuple(params)
+        tuple(params),
     )
-
-    return True, [dict(seat) for seat in seats]
+    return True, [dict(s) for s in seats]
 
 
 def _get_user_daily_hours(user_id, booking_date):
-    start_of_day = f'{booking_date} 00:00:00'
-    end_of_day = f'{booking_date} 23:59:59'
-
     reservations = query_db(
         """
         SELECT startTime, endTime
         FROM reservations
         WHERE uId = ?
         AND status IN ('upcoming', 'active')
-        AND startTime >= ?
-        AND startTime <= ?
+        AND startTime BETWEEN ? AND ?
         """,
-        (user_id, start_of_day, end_of_day)
+        (user_id, f'{booking_date} 00:00:00', f'{booking_date} 23:59:59'),
     )
-
-    return sum(_reservation_hours(row) for row in reservations)
+    return sum(_reservation_hours(r) for r in reservations)
 
 
 def book_seat(user_id, seat_id, booking_date, start_time, duration):
-    """Reserve a seat. Returns (True, success_msg) or (False, error_msg)."""
+    """Reserve a seat. Returns (True, msg) or (False, err)."""
     if not all([seat_id, booking_date, start_time, duration]):
         return False, 'All fields are required.'
 
     try:
         seat_id = int(seat_id)
-        duration = int(duration)
-        if duration not in (1, 2, 3, 4):
-            raise ValueError
-    except ValueError:
-        return False, 'Invalid seat ID or duration.'
+    except (TypeError, ValueError):
+        return False, 'Invalid seat ID.'
 
     try:
-        start_dt = _parse_booking_datetime(booking_date, start_time)
-    except ValueError:
-        return False, 'Invalid date or time format.'
+        start_dt, end_dt, duration = _validate_window(booking_date, start_time, duration)
+    except ValueError as e:
+        return False, str(e)
 
-    end_dt = start_dt + timedelta(hours=duration)
-    start_text = _format_datetime(start_dt)
-    end_text = _format_datetime(end_dt)
-
-    user_daily_hours = _get_user_daily_hours(user_id, booking_date)
-    if user_daily_hours + duration > MAX_HOURS_PER_DAY:
+    if _get_user_daily_hours(user_id, booking_date) + duration > MAX_HOURS_PER_DAY:
         return False, f'You can book at most {MAX_HOURS_PER_DAY} hours per day.'
 
     seat = query_db(
@@ -218,78 +360,43 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
         WHERE s.seatId = ?
         """,
         (seat_id,),
-        one=True
+        one=True,
     )
-
     if not seat:
         return False, 'Seat not found.'
-
     if seat['status'] == 'blocked' or seat['zone_status'] == 'maintenance':
         return False, 'This seat is not available.'
 
-    seat_conflict = query_db(
-        """
-        SELECT reservationId
-        FROM reservations
-        WHERE seatId = ?
-        AND status IN ('upcoming', 'active')
-        AND startTime < ?
-        AND endTime > ?
-        """,
-        (seat_id, end_text, start_text),
-        one=True
-    )
+    start_text, end_text = _fmt(start_dt), _fmt(end_dt)
 
-    if seat_conflict:
+    if _seat_overlap_reservation_id(seat_id, start_text, end_text):
         return False, 'This seat is already booked during that time.'
-
-    user_conflict = query_db(
-        """
-        SELECT reservationId
-        FROM reservations
-        WHERE uId = ?
-        AND status IN ('upcoming', 'active')
-        AND startTime < ?
-        AND endTime > ?
-        """,
-        (user_id, end_text, start_text),
-        one=True
-    )
-
-    if user_conflict:
+    if _user_overlap_reservation_id(user_id, start_text, end_text):
         return False, 'You already have a booking during that time.'
 
-    db = get_db()
+    now = datetime.now()
+    is_active_now = start_dt <= now < end_dt
+    status = 'active' if is_active_now else 'upcoming'
 
+    db = get_db()
     db.execute(
         """
         INSERT INTO reservations (uId, seatId, startTime, endTime, status)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (
-            user_id,
-            seat_id,
-            start_text,
-            end_text,
-            'upcoming',
-        )
+        (user_id, seat_id, start_text, end_text, status),
     )
-
-    now = datetime.now()
-    if start_dt <= now < end_dt:
+    if is_active_now:
         db.execute(
-            "UPDATE seats SET status = 'occupied' WHERE seatId = ?",
-            (seat_id,)
-        )
-        db.execute(
-            "UPDATE reservations SET status = 'active' WHERE uId = ? AND seatId = ? AND startTime = ?",
-            (user_id, seat_id, start_text)
+            "UPDATE seats SET status = 'occupied' WHERE seatId = ? AND status != 'blocked'",
+            (seat_id,),
         )
 
     db.commit()
     return True, 'Seat booked successfully!'
 
 
+# ─── Reservation listing / cancel ────────────────────────────────────────
 def get_user_reservations(user_id):
     update_expired_reservations()
 
@@ -304,16 +411,19 @@ def get_user_reservations(user_id):
             r.status,
             s.deskNo,
             z.name AS zoneName,
-            z.location
+            z.location,
+            c.checkInId,
+            c.checkInTime,
+            c.status AS checkInStatus
         FROM reservations r
         JOIN seats s ON r.seatId = s.seatId
         JOIN zones z ON s.zoneId = z.zoneId
+        LEFT JOIN check_in_logs c ON c.reservationId = r.reservationId
         WHERE r.uId = ?
         ORDER BY r.startTime DESC
         """,
-        (user_id,)
+        (user_id,),
     )
-
     return [dict(row) for row in reservations]
 
 
@@ -325,54 +435,23 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
         WHERE reservationId = ?
         """,
         (reservation_id,),
-        one=True
+        one=True,
     )
 
     if not reservation:
         return False, 'Reservation not found.'
-
-    if reservation['status'] not in ('upcoming', 'active'):
+    if reservation['status'] not in LIVE_STATUSES:
         return False, 'Only upcoming or active reservations can be cancelled.'
-
     if not is_admin and reservation['uId'] != user_id:
         return False, 'You can only cancel your own reservation.'
 
     db = get_db()
-
     db.execute(
-        """
-        UPDATE reservations
-        SET status = 'cancelled'
-        WHERE reservationId = ?
-        """,
-        (reservation_id,)
+        "UPDATE reservations SET status = 'cancelled' WHERE reservationId = ?",
+        (reservation_id,),
     )
 
-    now_text = _format_datetime(datetime.now())
-
-    active_now = query_db(
-        """
-        SELECT reservationId
-        FROM reservations
-        WHERE seatId = ?
-        AND status = 'active'
-        AND startTime <= ?
-        AND endTime > ?
-        """,
-        (reservation['seatId'], now_text, now_text),
-        one=True
-    )
-
-    if not active_now:
-        db.execute(
-            """
-            UPDATE seats
-            SET status = 'available'
-            WHERE seatId = ?
-            AND status != 'blocked'
-            """,
-            (reservation['seatId'],)
-        )
+    _recompute_seat_status(reservation['seatId'])
 
     if is_admin and reservation['uId'] != user_id:
         db.execute(
@@ -380,7 +459,7 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
             INSERT INTO admin_action_logs (userId, seatId, actionType)
             VALUES (?, ?, 'cancel_reservation')
             """,
-            (user_id, reservation['seatId'])
+            (user_id, reservation['seatId']),
         )
 
     db.commit()

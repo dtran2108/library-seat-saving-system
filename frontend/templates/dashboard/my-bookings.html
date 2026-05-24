@@ -37,6 +37,15 @@
                                         {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
                                         <span class="font-semibold text-foreground">{{ b.seat_label }}</span>
                                         {{ Badge(b.status) }}
+                                        {% if b.checked_in %}
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                                Checked in
+                                            </span>
+                                        {% elif b.can_check_in %}
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                                Check in by {{ b.check_in_deadline }}
+                                            </span>
+                                        {% endif %}
                                     </div>
                                     <p class="text-sm text-muted-foreground ml-6">
                                         {{ b.booking_date }}
@@ -46,14 +55,27 @@
                                     </p>
                                 </div>
 
-                                <button
-                                    type="button"
-                                    data-cancel-id="{{ b.reservationId }}"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-destructive/30 bg-transparent shadow-sm hover:bg-destructive/5 text-destructive h-8 px-3 shrink-0"
-                                >
-                                    {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
-                                    Cancel
-                                </button>
+                                <div class="flex gap-2 shrink-0">
+                                    {% if b.can_check_in %}
+                                        <button
+                                            type="button"
+                                            data-checkin-id="{{ b.reservationId }}"
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-8 px-3"
+                                        >
+                                            {{ Icon('check', class="w-4 h-4 mr-1") }}
+                                            Check In
+                                        </button>
+                                    {% endif %}
+
+                                    <button
+                                        type="button"
+                                        data-cancel-id="{{ b.reservationId }}"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-destructive/30 bg-transparent shadow-sm hover:bg-destructive/5 text-destructive h-8 px-3"
+                                    >
+                                        {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
                         {% endfor %}
                     </div>
@@ -111,6 +133,31 @@
                         setTimeout(() => location.reload(), 600);
                     } else {
                         showToast(data.error || 'Cancel failed.', 'error');
+                        btn.disabled = false;
+                    }
+                } catch {
+                    showToast('Network error. Please try again.', 'error');
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        document.querySelectorAll('[data-checkin-id]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.checkinId;
+                btn.disabled = true;
+                try {
+                    const res = await fetch(`/api/check-in/${id}`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': '{{ csrf_token() }}' },
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        setTimeout(() => location.reload(), 600);
+                    } else {
+                        showToast(data.error || 'Check-in failed.', 'error');
                         btn.disabled = false;
                     }
                 } catch {

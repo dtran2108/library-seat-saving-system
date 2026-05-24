@@ -1,13 +1,15 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import Blueprint, render_template, request, jsonify, session
 from decorators import login_required
 from controllers.seats import (
-    get_seat_map_data,
+    get_zones_with_seats,
     update_expired_reservations,
     get_available_seats,
     book_seat,
     get_user_reservations,
     cancel_reservation,
+    check_in_reservation,
+    CHECK_IN_GRACE_MINUTES,
 )
 
 seats_bp = Blueprint('seats', __name__)
@@ -24,6 +26,15 @@ def _decorate_reservation(row):
     row['start_time'] = start.strftime('%H:%M')
     row['end_time'] = end.strftime('%H:%M')
     row['seat_label'] = f"{row['zoneName']} · {row['deskNo']}"
+
+    deadline = start + timedelta(minutes=CHECK_IN_GRACE_MINUTES)
+    row['check_in_deadline'] = deadline.strftime('%H:%M')
+    row['checked_in'] = row.get('checkInId') is not None
+    row['can_check_in'] = (
+        row['status'] == 'active'
+        and not row['checked_in']
+        and datetime.now() <= deadline
+    )
     return row
 
 
@@ -40,7 +51,7 @@ def user_dashboard():
 @login_required
 def seat_map():
     update_expired_reservations()
-    zones = get_seat_map_data()
+    zones = get_zones_with_seats()
     return render_template("dashboard/seat-map.html", zones=zones, today=date.today().isoformat())
 
 
@@ -111,4 +122,13 @@ def api_cancel(reservation_id):
     if success:
         return jsonify(success=True, message=message)
 
+    return jsonify(success=False, error=message), 400
+
+
+@seats_bp.route('/api/check-in/<int:reservation_id>', methods=['POST'])
+@login_required
+def api_check_in(reservation_id):
+    success, message = check_in_reservation(reservation_id, session['user_id'])
+    if success:
+        return jsonify(success=True, message=message)
     return jsonify(success=False, error=message), 400
