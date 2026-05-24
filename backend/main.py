@@ -7,7 +7,7 @@ from db import close_db, query_db, init_db
 from routes.auth import auth_bp
 from routes.seats import seats_bp
 from routes.admin import admin_bp
-from controllers.seats import get_seat_map_data
+from controllers.seats import get_zones_with_seats
 
 _FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
 
@@ -40,7 +40,7 @@ def inject_current_user():
 
 @app.route('/')
 def index():
-    zones  = get_seat_map_data()
+    zones  = get_zones_with_seats()
     zone_a = next((z for z in zones if z['name'] == 'Learning Plaza A'), None)
     zone_b = next((z for z in zones if z['name'] == 'Learning Plaza B'), None)
     return render_template("index.html", zone_a=zone_a, zone_b=zone_b)

@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS admin_action_logs (
                        'block_seat',
                        'unblock_seat',
                        'cancel_reservation',
+                       'modify_reservation',
                        'issue_penalty',
                        'revoke_penalty',
                        'suspend_user',

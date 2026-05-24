@@ -6,13 +6,56 @@
 
 {% block title %}Seat Map{% endblock %}
 
+{% set time_slots = [
+    '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00', '20:00'
+] %}
+
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto">
 
-    {{ PageHeader("Seat Map", "Select a date, then click an available seat to book.", icon="map") }}
+    {{ PageHeader("Seat Map", "Pick a date and time — green seats are free for that window.", icon="map") }}
 
-    {# ── Date Picker ──────────────────────────────────────────────────── #}
-    {{ DatePicker(id="booking-date", value=today, wrapper_class="mb-6") }}
+    {# ── Find-a-seat bar: drives the whole grid ──────────────────────────── #}
+    <div class="bg-card border border-border rounded-2xl p-4 mb-5">
+        <div class="flex flex-wrap items-end gap-4">
+
+            {{ DatePicker(id="booking-date", value=today) }}
+
+            <div class="flex items-center gap-2">
+                <label for="booking-start" class="text-sm font-medium text-foreground flex items-center gap-2">
+                    {{ Icon('clock', class="w-4 h-4 text-muted-foreground") }}
+                    Start:
+                </label>
+                <select
+                    id="booking-start"
+                    class="border border-border rounded-xl px-3 py-1.5 text-sm bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                    {% for slot in time_slots %}
+                        <option value="{{ slot }}">{{ slot }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-foreground">Duration:</label>
+                <div class="flex gap-1" id="duration-btns">
+                    {% for d in [1, 2, 3, 4] %}
+                        <button
+                            type="button"
+                            data-duration="{{ d }}"
+                            class="duration-btn px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors {{ 'border-primary bg-primary/10 text-primary' if d == 1 else 'border-border text-muted-foreground hover:border-primary/50' }}"
+                        >
+                            {{ d }}h
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="window-summary" class="text-xs text-muted-foreground ml-auto"></div>
+        </div>
+    </div>
 
     {# ── Filter + Search Bar ──────────────────────────────────────────── #}
     <div class="bg-card border border-border rounded-2xl p-4 mb-5">
@@ -54,7 +97,7 @@
                        bg-secondary text-secondary-foreground hover:bg-muted"
             >
                 {{ zone.name }}
-                <span class="ml-1 opacity-60 font-normal" id="pill-count-{{ zone.zoneId }}">{{ zone.available }}/{{ zone.total }}</span>
+                <span class="ml-1 opacity-60 font-normal" id="pill-count-{{ zone.zoneId }}">0/{{ zone.total }}</span>
             </button>
             {% endfor %}
         </div>
@@ -68,7 +111,7 @@
         </div>
         <div class="flex items-center gap-1.5">
             <div class="w-5 h-5 rounded border-2 bg-red-50 border-red-300"></div>
-            <span class="text-xs text-muted-foreground">Booked</span>
+            <span class="text-xs text-muted-foreground">Reserved for this window</span>
         </div>
         <div class="flex items-center gap-1.5">
             <div class="w-5 h-5 rounded border-2 bg-gray-100 border-gray-300"></div>
@@ -90,6 +133,8 @@
                 class="zone-card bg-card border border-border rounded-2xl overflow-hidden"
                 data-zone-id="{{ zone.zoneId }}"
                 data-zone-name="{{ zone.name | lower }}"
+                data-zone-total="{{ zone.total }}"
+                data-zone-status="{{ zone.zone_status }}"
             >
 
                 {# ── Zone Header ──────────────────────────────────────── #}
@@ -107,15 +152,10 @@
                                      bg-amber-100 text-amber-700">
                             Closed — maintenance
                         </span>
-                    {% elif zone.available == 0 %}
-                        <span id="zone-badge-{{ zone.zoneId }}" class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
-                                     bg-red-100 text-red-700">
-                            Full · 0 / {{ zone.total }}
-                        </span>
                     {% else %}
                         <span id="zone-badge-{{ zone.zoneId }}" class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full
-                                     bg-green-100 text-green-700">
-                            {{ zone.available }} / {{ zone.total }} available
+                                     bg-secondary text-secondary-foreground">
+                            …
                         </span>
                     {% endif %}
                 </div>
@@ -128,19 +168,18 @@
                 {% else %}
                     <div class="px-6 pb-6">
 
-                        {# Plaza floor plan image — for Learning Plaza A & B #}
                         {% if zone.name == 'Learning Plaza A' %}
                         <div class="plaza-image-container relative mb-6 inline-block w-full">
-                            <img 
-                                src="{{ url_for('static', filename='plazaA.jpg') }}" 
+                            <img
+                                src="{{ url_for('static', filename='plazaA.jpg') }}"
                                 alt="Learning Plaza A Floor Plan"
                                 class="w-full h-auto rounded-lg border border-border shadow-sm"
                             />
                         </div>
                         {% elif zone.name == 'Learning Plaza B' %}
                         <div class="plaza-image-container relative mb-6 inline-block w-full">
-                            <img 
-                                src="{{ url_for('static', filename='plazaB.jpg') }}" 
+                            <img
+                                src="{{ url_for('static', filename='plazaB.jpg') }}"
                                 alt="Learning Plaza B Floor Plan"
                                 class="w-full h-auto rounded-lg border border-border shadow-sm"
                             />
@@ -148,47 +187,30 @@
                         {% endif %}
 
                         {# Seat grid — one flex row per physical row #}
-                        {# zone.cols drives how many seats appear side-by-side. #}
                         {% set cols = zone.cols %}
                         {% set total = zone.seats | length %}
                         <div class="flex flex-col gap-2.5 overflow-x-auto">
                         {% for row_start in range(0, total, cols) %}
                             {% set row_seats = zone.seats[row_start : row_start + cols] %}
                             <div class="flex items-center gap-3 min-w-fit">
-
-                                {# Seat buttons for this row #}
                                 <div class="flex gap-2">
                                 {% for seat in row_seats %}
-                                    {% if seat.status == 'occupied' %}
-                                        {% set cls = "bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75" %}
-                                    {% elif seat.status == 'blocked' %}
-                                        {% set cls = "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60" %}
-                                    {% else %}
-                                        {% set cls = "bg-green-50 border-green-300 text-green-700 hover:scale-105 hover:shadow-sm cursor-pointer" %}
-                                    {% endif %}
-
                                     {% set seat_label = zone.name ~ ' · ' ~ seat.deskNo %}
-
                                     <button
                                         type="button"
                                         data-seat-id="{{ seat.seatId }}"
+                                        data-seat-label="{{ seat_label }}"
+                                        data-blocked="{{ 'true' if seat.status == 'blocked' else 'false' }}"
                                         title="{{ seat_label }}"
-                                        class="w-14 h-14 rounded-xl border-2 text-xs font-semibold
-                                               transition-all duration-150 {{ cls }}"
-                                        {% if seat.status == 'available' %}
-                                            onclick='openBookingModal({{ seat.seatId }}, {{ seat_label | tojson }})'
-                                        {% else %}
-                                            disabled
-                                        {% endif %}
+                                        class="seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-secondary border-border text-muted-foreground"
+                                        disabled
                                     >
                                         {{ seat.deskNo }}
                                     </button>
                                 {% endfor %}
                                 </div>
-
                             </div>
 
-                            {# Aisle gap after every 2 rows (if more rows follow) #}
                             {% if loop.index is divisibleby 2 and not loop.last %}
                                 <div class="flex items-center gap-3">
                                     <div class="flex-1 border-t border-dashed border-muted-foreground/25"></div>
@@ -206,7 +228,6 @@
         {% endfor %}
         </div>
 
-        {# Empty state shown when filters eliminate all zones #}
         <div id="no-results" class="hidden bg-card border border-border rounded-2xl p-10 text-center">
             <p class="text-muted-foreground text-sm">No zones match your search.</p>
             <button onclick="setPill('all')" class="mt-3 text-xs text-primary hover:underline">
@@ -217,78 +238,193 @@
     {% endif %}
 </div>
 
-{# Booking modal #}
+{# Booking confirmation modal #}
 {{ BookingModal() }}
 
-{# ── Filter JavaScript ────────────────────────────────────────────────── #}
 <script>
-    // ── Post-booking state update ────────────────────────────────────────────
-    // Called by the booking modal after a successful API response.
-    function onSeatBooked(seatId) {
-        const btn = document.querySelector(`[data-seat-id="${seatId}"]`);
-        if (!btn) return;
+    // ── State ────────────────────────────────────────────────────────────
+    const SEAT_CLS = {
+        available: 'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-green-50 border-green-300 text-green-700 hover:scale-105 hover:shadow-sm cursor-pointer',
+        reserved:  'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75',
+        blocked:   'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60',
+        loading:   'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-secondary border-border text-muted-foreground animate-pulse',
+    };
 
-        // Mark seat as booked visually
-        btn.className = 'w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75';
-        btn.disabled = true;
-        btn.removeAttribute('onclick');
+    let selectedDuration = 1;
+    let activePill = 'all';
+    let fetchSeq = 0;  // guards against out-of-order responses
 
-        // Find the zone this seat belongs to
-        const zoneCard = btn.closest('[data-zone-id]');
-        if (!zoneCard) return;
-        const zoneId = zoneCard.dataset.zoneId;
+    // ── Window helpers ───────────────────────────────────────────────────
+    function getWindow() {
+        return {
+            date:     document.getElementById('booking-date').value,
+            start:    document.getElementById('booking-start').value,
+            duration: selectedDuration,
+        };
+    }
 
-        // Update the header badge (green count → decrement, or switch to "Full")
-        const badge = document.getElementById(`zone-badge-${zoneId}`);
-        if (badge) {
-            const match = badge.textContent.match(/(\d+)\s*\/\s*(\d+)/);
-            if (match) {
-                const newAvail = parseInt(match[1]) - 1;
-                const total    = parseInt(match[2]);
-                if (newAvail <= 0) {
+    function addHours(hhmm, hours) {
+        const [h, m] = hhmm.split(':').map(Number);
+        const t = h * 60 + m + hours * 60;
+        return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+    }
+
+    function updateWindowSummary() {
+        const w = getWindow();
+        const end = addHours(w.start, w.duration);
+        document.getElementById('window-summary').textContent =
+            `Showing seats free between ${w.start} – ${end}`;
+    }
+
+    // ── Availability fetch + recolor ─────────────────────────────────────
+    async function refreshAvailability() {
+        const w = getWindow();
+        if (!w.date || !w.start) return;
+
+        updateWindowSummary();
+
+        // Paint a loading state so users know we're refreshing.
+        document.querySelectorAll('.seat-btn').forEach(btn => {
+            if (btn.dataset.blocked === 'true') return;
+            btn.className = SEAT_CLS.loading;
+            btn.disabled = true;
+            btn.onclick = null;
+        });
+
+        const seq = ++fetchSeq;
+        const params = new URLSearchParams({
+            booking_date: w.date,
+            start_time:   w.start,
+            duration:     String(w.duration),
+        });
+
+        let availableIds = new Set();
+        try {
+            const res  = await fetch('/api/available?' + params.toString());
+            const data = await res.json();
+            if (seq !== fetchSeq) return;  // a newer request superseded this one
+            if (data.success) {
+                availableIds = new Set(data.seats.map(s => s.seatId));
+            } else {
+                if (typeof showToast === 'function') showToast(data.error || 'Could not load availability.', 'error');
+            }
+        } catch {
+            if (seq !== fetchSeq) return;
+            if (typeof showToast === 'function') showToast('Network error loading availability.', 'error');
+        }
+
+        applySeatStyles(availableIds);
+        updateZoneCounts(availableIds);
+    }
+
+    function applySeatStyles(availableIds) {
+        document.querySelectorAll('.seat-btn').forEach(btn => {
+            const seatId = Number(btn.dataset.seatId);
+            const blocked = btn.dataset.blocked === 'true';
+
+            if (blocked) {
+                btn.className = SEAT_CLS.blocked;
+                btn.disabled = true;
+                btn.onclick = null;
+                return;
+            }
+
+            if (availableIds.has(seatId)) {
+                btn.className = SEAT_CLS.available;
+                btn.disabled = false;
+                const label = btn.dataset.seatLabel || ('Seat ' + seatId);
+                btn.onclick = () => openBookingModal(seatId, label);
+            } else {
+                btn.className = SEAT_CLS.reserved;
+                btn.disabled = true;
+                btn.onclick = null;
+            }
+        });
+    }
+
+    function updateZoneCounts(availableIds) {
+        document.querySelectorAll('.zone-card').forEach(card => {
+            const zoneStatus = card.dataset.zoneStatus;
+            const zoneId = card.dataset.zoneId;
+            const total = parseInt(card.dataset.zoneTotal, 10) || 0;
+            const badge = document.getElementById(`zone-badge-${zoneId}`);
+            const pill = document.getElementById(`pill-count-${zoneId}`);
+
+            if (zoneStatus === 'maintenance') return;
+
+            const seats = card.querySelectorAll('.seat-btn');
+            let avail = 0;
+            seats.forEach(btn => {
+                const sid = Number(btn.dataset.seatId);
+                if (btn.dataset.blocked !== 'true' && availableIds.has(sid)) avail++;
+            });
+
+            if (badge) {
+                if (avail === 0) {
                     badge.className = 'shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-700';
                     badge.textContent = `Full · 0 / ${total}`;
                 } else {
-                    badge.textContent = `${newAvail} / ${total} available`;
+                    badge.className = 'shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700';
+                    badge.textContent = `${avail} / ${total} available`;
                 }
             }
-        }
-
-        // Update the pill count beside the zone name in the filter bar
-        const pill = document.getElementById(`pill-count-${zoneId}`);
-        if (pill) {
-            const match = pill.textContent.match(/(\d+)\/(\d+)/);
-            if (match) {
-                pill.textContent = `${parseInt(match[1]) - 1}/${match[2]}`;
-            }
-        }
+            if (pill) pill.textContent = `${avail}/${total}`;
+        });
     }
 
-    let activePill = 'all';
+    // Called by the booking modal after a successful booking.
+    function onSeatBooked() {
+        refreshAvailability();
+    }
 
-    // ── Pill filter ──────────────────────────────────────────────────────
+    // ── Top-bar control bindings ─────────────────────────────────────────
+    document.getElementById('booking-date').addEventListener('change', refreshAvailability);
+    document.getElementById('booking-start').addEventListener('change', refreshAvailability);
+
+    document.querySelectorAll('.duration-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedDuration = Number(btn.dataset.duration);
+            document.querySelectorAll('.duration-btn').forEach(b => {
+                const isActive = Number(b.dataset.duration) === selectedDuration;
+                b.className = 'duration-btn px-3 py-1.5 rounded-xl text-sm font-medium border-2 transition-colors '
+                    + (isActive ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:border-primary/50');
+            });
+            refreshAvailability();
+        });
+    });
+
+    // ── Default start_time: next round hour, clamped to 08:00–20:00 ──────
+    (function setDefaultStart() {
+        const sel = document.getElementById('booking-start');
+        const slots = Array.from(sel.options).map(o => o.value);
+        const now = new Date();
+        let candidate = String(now.getHours() + (now.getMinutes() > 0 ? 1 : 0)).padStart(2, '0') + ':00';
+        if (!slots.includes(candidate)) {
+            // Pick the first slot ≥ candidate, or fall back to the earliest slot.
+            candidate = slots.find(s => s >= candidate) || slots[0];
+        }
+        sel.value = candidate;
+    })();
+
+    // Initial paint
+    refreshAvailability();
+
+    // ── Zone search + pill filter (unchanged behavior) ───────────────────
     function setPill(value) {
         activePill = value;
-
-        // Sync the search input: clicking a specific pill sets the search text;
-        // "All" clears it so both controls stay consistent.
         const searchEl = document.getElementById('zone-search');
         if (value === 'all') {
             searchEl.value = '';
         } else {
-            // Find the zone name from the card's data attribute.
             const card = document.querySelector(`.zone-card[data-zone-id="${value}"]`);
             if (card) searchEl.value = card.dataset.zoneName;
         }
-
         updatePillStyles();
         applyFilters();
     }
 
-    // ── Text search ──────────────────────────────────────────────────────
     function onSearch(value) {
-        // Determine which pill (if any) matches the typed text exactly,
-        // otherwise fall back to 'all' so no pill stays incorrectly highlighted.
         const q = value.trim().toLowerCase();
         let match = 'all';
         document.querySelectorAll('.zone-card').forEach(card => {
@@ -299,34 +435,27 @@
         applyFilters();
     }
 
-    // ── Apply both filters together ──────────────────────────────────────
     function applyFilters() {
         const q = document.getElementById('zone-search').value.trim().toLowerCase();
         let anyVisible = false;
-
         document.querySelectorAll('.zone-card').forEach(card => {
-            const name = card.dataset.zoneName;   // already lowercase
+            const name = card.dataset.zoneName;
             const id   = card.dataset.zoneId;
-
-            // Show the card only if it passes both the pill AND the text search.
             const matchesPill   = activePill === 'all' || id === activePill;
             const matchesSearch = q === '' || name.includes(q);
             const show = matchesPill && matchesSearch;
-
             card.classList.toggle('hidden', !show);
             if (show) anyVisible = true;
         });
-
         document.getElementById('no-results').classList.toggle('hidden', anyVisible);
     }
 
-    // ── Pill button styling ──────────────────────────────────────────────
     function updatePillStyles() {
         document.querySelectorAll('.pill-btn').forEach(btn => {
             const isActive = btn.dataset.pill === activePill;
-            btn.classList.toggle('bg-primary',              isActive);
-            btn.classList.toggle('text-primary-foreground', isActive);
-            btn.classList.toggle('bg-secondary',            !isActive);
+            btn.classList.toggle('bg-primary',                isActive);
+            btn.classList.toggle('text-primary-foreground',   isActive);
+            btn.classList.toggle('bg-secondary',              !isActive);
             btn.classList.toggle('text-secondary-foreground', !isActive);
         });
     }
