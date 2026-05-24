@@ -374,5 +374,14 @@ def cancel_reservation(reservation_id, user_id, is_admin=False):
             (reservation['seatId'],)
         )
 
+    if is_admin and reservation['uId'] != user_id:
+        db.execute(
+            """
+            INSERT INTO admin_action_logs (userId, seatId, actionType)
+            VALUES (?, ?, 'cancel_reservation')
+            """,
+            (user_id, reservation['seatId'])
+        )
+
     db.commit()
     return True, 'Reservation cancelled successfully.'

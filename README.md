@@ -722,7 +722,7 @@ A living record of what is done and what still needs to be built. Update this as
 - [x] Admin dashboard — overview of all zones and aggregate seat stats (total, blocked)
 - [x] Block a seat for maintenance (change status to `blocked`)
 - [x] Unblock a seat (restore it to `available`)
-- [ ] View and override any active reservation
+- [x] View and override any active reservation
 
 ---
 
