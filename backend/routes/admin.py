@@ -4,6 +4,12 @@ from flask import Blueprint, render_template, request, jsonify, session, url_for
 from decorators import admin_required
 from controllers.admin import (
     get_dashboard_data,
+    get_admin_kpis,
+    get_hourly_bookings,
+    get_metric_series,
+    get_peak_hour_forecast,
+    get_zone_summaries,
+    recent_admin_actions,
     block_seat,
     unblock_seat,
     get_bookings_for_date,
@@ -38,6 +44,13 @@ def admin_dashboard():
         selected_date=today,
         bookings=bookings,
         booking_enabled=is_booking_enabled(),
+        kpis=get_admin_kpis(),
+        hourly_bookings=get_hourly_bookings(24),
+        bookings_series=get_metric_series('bookings', 7),
+        no_show_series=get_metric_series('no_shows', 7),
+        peak_forecast=get_peak_hour_forecast(30),
+        zone_summaries=get_zone_summaries(30, top_n=3),
+        recent_actions=recent_admin_actions(8),
     )
 
 
@@ -89,6 +102,18 @@ def api_admin_cancel_reservation(reservation_id):
     if success:
         return jsonify(success=True, message=message)
     return jsonify(success=False, error=message), 400
+
+
+@admin_bp.route('/manage-seats')
+@admin_required
+def manage_seats():
+    zones, total_seats, blocked_seats = get_dashboard_data()
+    return render_template(
+        "dashboard/manage-seats.html",
+        zones=zones,
+        total_seats=total_seats,
+        blocked_seats=blocked_seats,
+    )
 
 
 @admin_bp.route('/manage-users')

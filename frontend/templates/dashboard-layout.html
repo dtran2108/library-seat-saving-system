@@ -13,7 +13,8 @@
 {%
     set admin_items = [
         {'endpoint': 'admin.admin_dashboard', 'label': 'Admin Panel', 'icon': 'settings'},
-        {'endpoint': 'admin.manage_users', 'label': 'Manage Users', 'icon': 'users'}
+        {'endpoint': 'admin.manage_seats',    'label': 'Manage Seats', 'icon': 'map'},
+        {'endpoint': 'admin.manage_users',    'label': 'Manage Users', 'icon': 'users'}
     ]
 %}
 
@@ -50,6 +51,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{% block title %}Group 6 - MIS205{% endblock %}</title>
         <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet" />
+        <!-- Chart.js 4 — used by the admin dashboard's trend, gauge, and ring widgets -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
     </head>
     <body class="bg-background font-sans antialiased">
         <div class="min-h-screen flex bg-background">
@@ -167,7 +170,7 @@
             {# ════════════════════════════════════════════
                Main Content
                ════════════════════════════════════════════ #}
-            <main class="flex-1 md:ml-56 pt-14 md:pt-0 min-h-screen">
+            <main class="flex-1 md:ml-56 pt-14 md:pt-0 min-h-screen bg-muted/40">
                 {% block content %}{% endblock %}
             </main>
         </div>
