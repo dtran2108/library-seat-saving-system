@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from db import query_db, get_db
+from controllers.system import is_booking_enabled
 
 
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
@@ -361,6 +362,9 @@ def _get_user_daily_hours(user_id, booking_date):
 
 def book_seat(user_id, seat_id, booking_date, start_time, duration):
     """Reserve a seat. Returns (True, msg) or (False, err)."""
+    if not is_booking_enabled():
+        return False, 'Bookings are temporarily disabled by the library staff.'
+
     if not all([seat_id, booking_date, start_time, duration]):
         return False, 'All fields are required.'
 

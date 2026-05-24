@@ -1,6 +1,6 @@
 from datetime import date
 
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, url_for
 from decorators import admin_required
 from controllers.admin import (
     get_dashboard_data,
@@ -14,6 +14,12 @@ from controllers.admin import (
     revoke_user_penalty,
 )
 from controllers.seats import cancel_reservation
+from controllers.system import is_booking_enabled, set_booking_enabled
+from controllers.admin_invites import (
+    create_invite,
+    list_pending_invites,
+    revoke_invite,
+)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -31,7 +37,18 @@ def admin_dashboard():
         blocked_seats=blocked_seats,
         selected_date=today,
         bookings=bookings,
+        booking_enabled=is_booking_enabled(),
     )
+
+
+@admin_bp.route('/api/admin/booking-system/toggle', methods=['POST'])
+@admin_required
+def api_admin_toggle_booking_system():
+    enabled_param = request.form.get('enabled', '').strip().lower()
+    if enabled_param not in ('true', 'false'):
+        return jsonify(success=False, error='Invalid value for "enabled".'), 400
+    success, message = set_booking_enabled(enabled_param == 'true', session['user_id'])
+    return jsonify(success=success, message=message, enabled=enabled_param == 'true')
 
 
 @admin_bp.route('/api/admin/bookings')
@@ -80,8 +97,33 @@ def manage_users():
     return render_template(
         "dashboard/manage-users.html",
         users=list_users(),
+        pending_invites=list_pending_invites(),
         current_admin_id=session['user_id'],
     )
+
+
+@admin_bp.route('/api/admin/invites', methods=['POST'])
+@admin_required
+def api_admin_create_invite():
+    uid   = request.form.get('uId', '').strip()
+    uname = request.form.get('uname', '').strip()
+    phone = request.form.get('phoneNo', '').strip()
+
+    success, result = create_invite(uid, uname, phone, session['user_id'])
+    if not success:
+        return jsonify(success=False, error=result), 400
+
+    signup_url = url_for('auth.admin_signup', token=result['token'], _external=True)
+    return jsonify(success=True, invite={**result, 'signup_url': signup_url})
+
+
+@admin_bp.route('/api/admin/invites/<int:invite_id>/revoke', methods=['POST'])
+@admin_required
+def api_admin_revoke_invite(invite_id):
+    success, message = revoke_invite(invite_id, session['user_id'])
+    if success:
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message), 400
 
 
 @admin_bp.route('/api/admin/users')

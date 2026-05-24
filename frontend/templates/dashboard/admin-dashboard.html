@@ -124,6 +124,46 @@
     <div class="p-6 max-w-5xl mx-auto">
         {{ PageHeader("Admin Panel", "Manage bookings and seats.", icon="settings") }}
 
+        {# ── Booking system kill switch ──────────────────────────────── #}
+        <div
+            id="booking-system-card"
+            class="border rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 {{ 'bg-green-50 border-green-200' if booking_enabled else 'bg-red-50 border-red-200' }}"
+        >
+            <div class="flex items-start gap-3">
+                <span id="booking-system-icon" class="shrink-0 mt-0.5">
+                    {% if booking_enabled %}
+                        {{ Icon('check', class="w-5 h-5 text-green-700") }}
+                    {% else %}
+                        {{ Icon('lock', class="w-5 h-5 text-red-700") }}
+                    {% endif %}
+                </span>
+                <div>
+                    <p class="font-semibold text-foreground">
+                        Booking system:
+                        <span id="booking-system-state" class="{{ 'text-green-700' if booking_enabled else 'text-red-700' }}">
+                            {{ 'Enabled' if booking_enabled else 'Disabled' }}
+                        </span>
+                    </p>
+                    <p id="booking-system-hint" class="text-xs text-muted-foreground mt-0.5">
+                        {% if booking_enabled %}
+                            Users can book new seats. Toggle off during maintenance.
+                        {% else %}
+                            New bookings are blocked. Existing reservations and check-ins still work.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <button
+                type="button"
+                id="booking-system-toggle"
+                data-enabled="{{ 'true' if booking_enabled else 'false' }}"
+                onclick="toggleBookingSystem()"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 shrink-0 transition-colors disabled:opacity-50 disabled:pointer-events-none {{ 'border border-destructive/40 bg-transparent text-destructive hover:bg-destructive/5' if booking_enabled else 'bg-primary text-primary-foreground hover:bg-primary/90' }}"
+            >
+                {{ 'Disable booking' if booking_enabled else 'Enable booking' }}
+            </button>
+        </div>
+
         {# ── Stat cards ───────────────────────────────────────────────── #}
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
             {{ StatCard("Total Seats", total_seats) }}
@@ -688,6 +728,67 @@
                     countEl.textContent = String(Math.max(0, n + delta));
                 }
             }
+        }
+
+        // ── Booking system toggle ────────────────────────────────────────
+        async function toggleBookingSystem() {
+            const btn = document.getElementById("booking-system-toggle");
+            const currentlyEnabled = btn.dataset.enabled === "true";
+            const next = !currentlyEnabled;
+            const confirmMsg = next
+                ? "Re-enable bookings? Users will be able to reserve seats again."
+                : "Disable bookings? Users will not be able to make new reservations until you re-enable.";
+            if (!confirm(confirmMsg)) return;
+
+            btn.disabled = true;
+            const fd = new FormData();
+            fd.append("csrf_token", "{{ csrf_token() }}");
+            fd.append("enabled", next ? "true" : "false");
+
+            try {
+                const res  = await fetch("/api/admin/booking-system/toggle", { method: "POST", body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    if (typeof showToast === "function") showToast(data.message, "success");
+                    applyBookingSystemUI(data.enabled);
+                } else {
+                    if (typeof showToast === "function") showToast(data.error || "Toggle failed.", "error");
+                }
+            } catch {
+                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function applyBookingSystemUI(enabled) {
+            const card  = document.getElementById("booking-system-card");
+            const btn   = document.getElementById("booking-system-toggle");
+            const state = document.getElementById("booking-system-state");
+            const hint  = document.getElementById("booking-system-hint");
+
+            btn.dataset.enabled = enabled ? "true" : "false";
+            btn.textContent     = enabled ? "Disable booking" : "Enable booking";
+
+            // Card palette
+            card.classList.toggle("bg-green-50", enabled);
+            card.classList.toggle("border-green-200", enabled);
+            card.classList.toggle("bg-red-50", !enabled);
+            card.classList.toggle("border-red-200", !enabled);
+
+            // Button palette
+            const onClasses  = ["border", "border-destructive/40", "bg-transparent", "text-destructive", "hover:bg-destructive/5"];
+            const offClasses = ["bg-primary", "text-primary-foreground", "hover:bg-primary/90"];
+            btn.classList.remove(...onClasses, ...offClasses);
+            btn.classList.add(...(enabled ? onClasses : offClasses));
+
+            // Label + hint
+            state.textContent = enabled ? "Enabled" : "Disabled";
+            state.classList.toggle("text-green-700", enabled);
+            state.classList.toggle("text-red-700", !enabled);
+            hint.textContent = enabled
+                ? "Users can book new seats. Toggle off during maintenance."
+                : "New bookings are blocked. Existing reservations and check-ins still work.";
         }
     </script>
 {% endblock %}

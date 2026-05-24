@@ -6,12 +6,14 @@ PRAGMA foreign_keys = ON;
 -- Clean slate — drop in reverse FK order so dependents go first.
 -- ─────────────────────────────────────────────────────────────
 DROP TRIGGER IF EXISTS auto_release_seat;
+DROP TABLE   IF EXISTS admin_invites;
 DROP TABLE   IF EXISTS admin_action_logs;
 DROP TABLE   IF EXISTS penalties;
 DROP TABLE   IF EXISTS check_in_logs;
 DROP TABLE   IF EXISTS reservations;
 DROP TABLE   IF EXISTS seats;
 DROP TABLE   IF EXISTS zones;
+DROP TABLE   IF EXISTS system_settings;
 DROP TABLE   IF EXISTS users;
 
 -- ─────────────────────────────────────────────────────────────
@@ -26,6 +28,18 @@ CREATE TABLE IF NOT EXISTS users (
                  CHECK (role IN ('user', 'admin')),
     ustatus  TEXT NOT NULL DEFAULT 'active'
                  CHECK (ustatus IN ('active', 'suspended'))
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- SystemSetting — runtime key/value config (e.g. the booking
+-- kill switch). updatedBy is the admin who last toggled it.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS system_settings (
+    skey      TEXT PRIMARY KEY,
+    svalue    TEXT NOT NULL,
+    updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updatedBy TEXT,
+    FOREIGN KEY (updatedBy) REFERENCES users(uId)
 );
 
 -- ─────────────────────────────────────────────────────────────
@@ -135,6 +149,27 @@ CREATE TABLE IF NOT EXISTS admin_action_logs (
     FOREIGN KEY (userId) REFERENCES users(uId),
     FOREIGN KEY (seatId) REFERENCES seats(seatId),
     FOREIGN KEY (penaltyId) REFERENCES penalties(penaltyId)
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- AdminInvite — single-use, time-limited tokens that grant
+-- admin signup. createdBy is the issuing admin; usedBy is the
+-- invitee (set on consumption).
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS admin_invites (
+    inviteId   INTEGER PRIMARY KEY AUTOINCREMENT,
+    token      TEXT NOT NULL UNIQUE,
+    uId        TEXT NOT NULL,
+    uname      TEXT NOT NULL,
+    phoneNo    TEXT,
+    createdBy  TEXT NOT NULL,
+    createdAt  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expiresAt  DATETIME NOT NULL,
+    usedAt     DATETIME,
+    usedBy     TEXT,
+    revokedAt  DATETIME,
+    revokedBy  TEXT,
+    FOREIGN KEY (createdBy) REFERENCES users(uId)
 );
 -- ─────────────────────────────────────────────────────────────
 -- Trigger: auto-release seat on missed check-in
