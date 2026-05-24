@@ -1,63 +1,195 @@
 {% extends "dashboard-layout.html" %}
 
-{# Import Macros #}
 {% from "components/ui/icon.html" import Icon %}
-{% from "components/ui/button.html" import Button %}
 {% from "components/ui/badge.html" import Badge %}
 {% from "components/ui/page-header.html" import PageHeader %}
+{% from "components/ui/dialog.html" import Dialog %}
+{% from "components/ui/alert-dialog.html" import AlertDialog %}
 
 {% block title %}Manage Users{% endblock %}
 
 {% block content %}
 
-    {# --- MOCK DATA FOR UI TESTING (Remove when connecting backend) --- #}
-    {%
-        set users = [
-            {'id': 1, 'full_name': 'Admin User', 'email': 'admin@nsysu.edu.tw', 'student_id': 'M000001', 'role': 'admin'},
-            {'id': 2, 'full_name': 'Duc Tran', 'email': 'duc.tran@nsysu.edu.tw', 'student_id': 'M135790', 'role': 'student'},
-            {'id': 3, 'full_name': '', 'email': 'newuser@student.nsysu.edu.tw', 'student_id': '', 'role': 'student'},
-            {'id': 4, 'full_name': 'Chen Wei', 'email': 'chen.wei@nsysu.edu.tw', 'student_id': 'M246801', 'role': 'student'},
-            {'id': 5, 'full_name': 'Lin Mei', 'email': 'lin.mei@nsysu.edu.tw', 'student_id': 'M112233', 'role': 'admin'}
-        ]
-    %}
-    {% set current_user_id = 1 %}
-    {# ----------------------------------------------------------------- #}
+<div class="p-6 max-w-6xl mx-auto">
+    <div class="flex items-start justify-between gap-3 flex-wrap mb-2">
+        <div class="flex-1 min-w-0">
+            {{ PageHeader("User Management", "Suspend accounts, manage penalties, invite new admins.", icon="users") }}
+        </div>
+        <button
+            type="button"
+            onclick="openInviteDialog()"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 shrink-0 mt-2"
+        >
+            {{ Icon('user-plus', class="w-4 h-4") }}
+            Invite Admin
+        </button>
+    </div>
 
-    <div class="p-6 max-w-4xl mx-auto">
-        {{ PageHeader("User Management", "View and manage library patron accounts.", icon="users") }}
+    {# ── Pending invites ────────────────────────────────────────────── #}
+    {% if pending_invites %}
+        <div class="bg-card border border-border rounded-2xl p-4 mb-5">
+            <div class="flex items-center gap-2 mb-3">
+                {{ Icon('mail', class="w-4 h-4 text-primary") }}
+                <h2 class="text-sm font-semibold text-foreground">Pending admin invites ({{ pending_invites|length }})</h2>
+            </div>
+            <ul class="divide-y divide-border">
+                {% for inv in pending_invites %}
+                    <li class="py-3 flex items-start justify-between gap-3" id="invite-row-{{ inv.inviteId }}">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-foreground">{{ inv.uname }} <span class="text-xs text-muted-foreground font-mono">({{ inv.uId }})</span></p>
+                            <p class="text-xs text-muted-foreground mt-0.5">
+                                Expires {{ inv.expiresAt }}
+                            </p>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button
+                                type="button"
+                                data-token="{{ inv.token }}"
+                                onclick="showInviteLink(this.dataset.token, '{{ inv.uname }}', '{{ inv.uId }}')"
+                                class="inline-flex items-center justify-center gap-1 rounded-md text-xs font-medium border border-primary/40 bg-transparent text-primary hover:bg-primary/5 h-7 px-2.5"
+                            >
+                                {{ Icon('link', class="w-3 h-3") }} Show link
+                            </button>
+                            <button
+                                type="button"
+                                data-revoke-invite="{{ inv.inviteId }}"
+                                class="inline-flex items-center justify-center gap-1 rounded-md text-xs font-medium border border-destructive/40 bg-transparent text-destructive hover:bg-destructive/5 h-7 px-2.5"
+                            >
+                                {{ Icon('x', class="w-3 h-3") }} Revoke
+                            </button>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
 
+    {# ── Search bar ─────────────────────────────────────────────────── #}
+    <div class="relative mb-4">
+        <div class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-muted-foreground"
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+        </div>
+        <input
+            id="user-search"
+            type="text"
+            placeholder="Search by name or student ID…"
+            oninput="filterUsers(this.value)"
+            class="w-full pl-9 pr-3 h-9 rounded-xl border border-input bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+        />
+    </div>
+
+    {# ── User list ──────────────────────────────────────────────────── #}
+    {% if not users %}
+        <div class="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">
+            No users found.
+        </div>
+    {% else %}
         <div class="bg-card border border-border rounded-2xl overflow-hidden">
             <table class="w-full text-sm">
                 <thead class="bg-muted">
-                    <tr>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Student ID</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
-                        <th class="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                    <tr class="text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        <th class="px-4 py-3">User</th>
+                        <th class="px-4 py-3 hidden md:table-cell">Phone</th>
+                        <th class="px-4 py-3">Role</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3 hidden lg:table-cell">Stats</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="divide-y divide-border">
                     {% for u in users %}
-                        <tr class="{{ 'bg-muted/30' if loop.index is odd else '' }}">
-                            <td class="px-4 py-3 font-medium text-foreground">{{ u.full_name or '—' }}</td>
-                            <td class="px-4 py-3 text-muted-foreground">{{ u.email }}</td>
-                            <td class="px-4 py-3 text-muted-foreground hidden sm:table-cell">{{ u.student_id or '—' }}</td>
-                            <td class="px-4 py-3">
-                                {{ Badge(u.role or 'student', variant='primary' if u.role == 'admin' else 'secondary') }}
+                        {% set is_self = u.uId == current_admin_id %}
+                        {% set is_suspended = u.ustatus == 'suspended' %}
+                        {% set has_penalty = u.active_penalty_id is not none %}
+                        <tr
+                            class="user-row"
+                            data-user-id="{{ u.uId }}"
+                            data-search="{{ (u.uname ~ ' ' ~ u.uId) | lower }}"
+                            id="user-row-{{ u.uId }}"
+                        >
+                            <td class="px-4 py-3 align-top">
+                                <p class="font-medium text-foreground">{{ u.uname }}</p>
+                                <p class="text-xs text-muted-foreground">{{ u.uId }}</p>
+                                {% if has_penalty %}
+                                    <p class="text-xs text-red-600 mt-1">
+                                        {{ Icon('alert-triangle', class="w-3 h-3 inline -mt-px") }}
+                                        Penalty until {{ u.active_penalty_end }}
+                                    </p>
+                                    <p class="text-xs text-muted-foreground italic ml-4">
+                                        “{{ u.active_penalty_reason }}”
+                                    </p>
+                                {% endif %}
                             </td>
-                            <td class="px-4 py-3">
-                                {% if u.id != current_user_id %}
-                                    <form action="#" method="POST" class="inline">
-                                        <input type="hidden" name="user_id" value="{{ u.id }}" />
-                                        {{ Button(
-                                            "Make " ~ ("Student" if u.role == "admin" else "Admin"),
-                                            variant="ghost",
-                                            size="sm",
-                                            type="submit",
-                                            class="text-xs h-7"
-                                        ) }}
-                                    </form>
+                            <td class="px-4 py-3 text-muted-foreground align-top hidden md:table-cell">
+                                {{ u.phoneNo or '—' }}
+                            </td>
+                            <td class="px-4 py-3 align-top">
+                                {{ Badge(u.role, variant='primary' if u.role == 'admin' else 'secondary') }}
+                            </td>
+                            <td class="px-4 py-3 align-top">
+                                {% if is_suspended %}
+                                    {{ Badge('suspended', variant='destructive') }}
+                                {% else %}
+                                    {{ Badge('active', variant='success') }}
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-xs text-muted-foreground align-top hidden lg:table-cell">
+                                <p>Bookings: <span class="text-foreground font-medium">{{ u.bookings_count }}</span></p>
+                                <p>No-shows: <span class="text-foreground font-medium">{{ u.no_show_count }}</span></p>
+                            </td>
+                            <td class="px-4 py-3 align-top">
+                                {% if is_self %}
+                                    <p class="text-xs text-muted-foreground italic text-right">(you)</p>
+                                {% else %}
+                                    <div class="flex flex-wrap gap-2 justify-end">
+                                        {% if is_suspended %}
+                                            <button
+                                                type="button"
+                                                data-action="reactivate"
+                                                data-user-id="{{ u.uId }}"
+                                                data-user-name="{{ u.uname }}"
+                                                class="user-action inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-xs font-medium border border-green-300 bg-transparent text-green-700 hover:bg-green-50 h-7 px-2.5"
+                                            >
+                                                {{ Icon('check', class="w-3 h-3") }} Reactivate
+                                            </button>
+                                        {% else %}
+                                            <button
+                                                type="button"
+                                                data-action="suspend"
+                                                data-user-id="{{ u.uId }}"
+                                                data-user-name="{{ u.uname }}"
+                                                class="user-action inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-xs font-medium border border-destructive/40 bg-transparent text-destructive hover:bg-destructive/5 h-7 px-2.5"
+                                            >
+                                                {{ Icon('lock', class="w-3 h-3") }} Suspend
+                                            </button>
+                                        {% endif %}
+
+                                        {% if has_penalty %}
+                                            <button
+                                                type="button"
+                                                data-action="revoke-penalty"
+                                                data-penalty-id="{{ u.active_penalty_id }}"
+                                                data-user-name="{{ u.uname }}"
+                                                class="user-action inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-xs font-medium border border-primary/40 bg-transparent text-primary hover:bg-primary/5 h-7 px-2.5"
+                                            >
+                                                {{ Icon('check', class="w-3 h-3") }} Revoke Penalty
+                                            </button>
+                                        {% else %}
+                                            <button
+                                                type="button"
+                                                data-action="issue-penalty"
+                                                data-user-id="{{ u.uId }}"
+                                                data-user-name="{{ u.uname }}"
+                                                class="user-action inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-xs font-medium border border-amber-400 bg-transparent text-amber-700 hover:bg-amber-50 h-7 px-2.5"
+                                            >
+                                                {{ Icon('alert-triangle', class="w-3 h-3") }} Issue Penalty
+                                            </button>
+                                        {% endif %}
+                                    </div>
                                 {% endif %}
                             </td>
                         </tr>
@@ -65,6 +197,412 @@
                 </tbody>
             </table>
         </div>
+
+        <div id="no-results" class="hidden bg-card border border-border rounded-2xl p-10 text-center mt-4">
+            <p class="text-muted-foreground text-sm">No users match your search.</p>
+        </div>
+    {% endif %}
+</div>
+
+{# ── Suspend/Reactivate confirm dialogs ──────────────────────────── #}
+{{ AlertDialog(
+    id="suspend-alert",
+    title="Suspend this user?",
+    description="Suspended users cannot log in or make new bookings. Existing reservations are preserved.",
+    confirm_label="Suspend user",
+    cancel_label="Cancel",
+    confirm_onclick="confirmStatusChange()"
+) }}
+
+{{ AlertDialog(
+    id="reactivate-alert",
+    title="Reactivate this user?",
+    description="The user will be able to log in and book seats again.",
+    confirm_label="Reactivate user",
+    cancel_label="Cancel",
+    confirm_onclick="confirmStatusChange()"
+) }}
+
+{{ AlertDialog(
+    id="revoke-penalty-alert",
+    title="Revoke this penalty?",
+    description="The user will be able to book seats again immediately.",
+    confirm_label="Revoke penalty",
+    cancel_label="Cancel",
+    confirm_onclick="confirmRevokePenalty()"
+) }}
+
+{# ── Issue-penalty dialog ───────────────────────────────────────── #}
+{% call Dialog(id="penalty-dialog", title="Issue Penalty") %}
+    <div class="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2 mb-4">
+        {{ Icon('user', class="w-4 h-4 text-primary") }}
+        <span class="font-semibold text-foreground" id="penalty-user-label">User --</span>
     </div>
+
+    <form id="penalty-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+        <div class="mb-4">
+            <label for="penalty-reason" class="text-sm font-medium text-foreground block mb-2">Reason</label>
+            <textarea
+                id="penalty-reason"
+                name="reason"
+                rows="3"
+                maxlength="280"
+                required
+                placeholder="e.g. Three consecutive no-shows"
+                class="w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            ></textarea>
+        </div>
+
+        <div class="mb-4">
+            <label for="penalty-end-date" class="text-sm font-medium text-foreground block mb-2">Penalty ends on</label>
+            <input
+                id="penalty-end-date"
+                name="end_date"
+                type="date"
+                required
+                class="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+        </div>
+
+        <div id="penalty-error" class="hidden mb-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2"></div>
+
+        <div class="flex gap-2">
+            <button
+                type="button"
+                onclick="closeDialog('penalty-dialog')"
+                class="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-card hover:bg-secondary h-9 px-4 py-2"
+            >Cancel</button>
+            <button
+                type="submit"
+                id="penalty-submit"
+                class="flex-[2] inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium bg-destructive text-destructive-foreground shadow hover:bg-destructive/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none"
+            >Issue Penalty</button>
+        </div>
+    </form>
+{% endcall %}
+
+{# ── Invite-admin dialog ────────────────────────────────────────── #}
+{% call Dialog(id="invite-dialog", title="Invite a new admin") %}
+    <p class="text-sm text-muted-foreground mb-4">
+        Enter the new admin's Student ID and name. We'll generate a single-use signup link you can share with them.
+    </p>
+    <form id="invite-form" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+        <div class="space-y-1.5">
+            <label for="invite-uid" class="text-sm font-medium text-foreground">Student ID</label>
+            <input
+                id="invite-uid"
+                name="uId"
+                type="text"
+                required
+                placeholder="e.g. B123456789"
+                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+        </div>
+        <div class="space-y-1.5">
+            <label for="invite-name" class="text-sm font-medium text-foreground">Full name</label>
+            <input
+                id="invite-name"
+                name="uname"
+                type="text"
+                required
+                maxlength="100"
+                placeholder="Their full name"
+                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+        </div>
+        <div class="space-y-1.5">
+            <label for="invite-phone" class="text-sm font-medium text-foreground">Phone <span class="text-muted-foreground font-normal">(optional)</span></label>
+            <input
+                id="invite-phone"
+                name="phoneNo"
+                type="text"
+                placeholder="0912-345-678"
+                class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+        </div>
+
+        <div id="invite-error" class="hidden text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2"></div>
+
+        <div class="flex gap-2">
+            <button
+                type="button"
+                onclick="closeDialog('invite-dialog')"
+                class="flex-1 inline-flex items-center justify-center rounded-md text-sm font-medium border border-border bg-card hover:bg-secondary h-9 px-4"
+            >Cancel</button>
+            <button
+                type="submit"
+                id="invite-submit"
+                class="flex-[2] inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 disabled:opacity-50 disabled:pointer-events-none"
+            >Generate invite link</button>
+        </div>
+    </form>
+{% endcall %}
+
+{# ── Invite-link result dialog (shown after a successful invite) ──── #}
+{% call Dialog(id="invite-link-dialog", title="Invite link ready") %}
+    <p class="text-sm text-muted-foreground mb-3">
+        Share this single-use link with <span id="invite-link-target" class="font-medium text-foreground"></span>. They'll choose their own password.
+    </p>
+
+    <div class="flex items-stretch gap-2 mb-3">
+        <input
+            id="invite-link-url"
+            type="text"
+            readonly
+            class="flex-1 h-9 rounded-md border border-input bg-secondary/40 px-3 py-1 text-xs font-mono shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+        <button
+            type="button"
+            id="invite-link-copy"
+            onclick="copyInviteLink()"
+            class="inline-flex items-center justify-center gap-1 rounded-md text-xs font-medium border border-border bg-card hover:bg-secondary h-9 px-3 shrink-0"
+        >
+            {{ Icon('copy', class="w-3.5 h-3.5") }} Copy
+        </button>
+    </div>
+
+    <p class="text-xs text-muted-foreground mb-4">
+        {{ Icon('clock', class="w-3 h-3 inline -mt-px") }}
+        Link expires in 7 days. You can revoke it from the Pending invites list.
+    </p>
+
+    <button
+        type="button"
+        onclick="closeDialog('invite-link-dialog'); location.reload();"
+        class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4"
+    >Done</button>
+{% endcall %}
+
+{# ── Revoke-invite confirm ──────────────────────────────────────── #}
+{{ AlertDialog(
+    id="revoke-invite-alert",
+    title="Revoke this invite?",
+    description="The signup link will stop working immediately. You can always issue a new one.",
+    confirm_label="Revoke invite",
+    cancel_label="Keep it",
+    confirm_onclick="confirmRevokeInvite()"
+) }}
+
+<script>
+    const CSRF = '{{ csrf_token() }}';
+
+    // ── Pending action context (filled when an action button is clicked) ──
+    let pendingAction = null;  // { type, userId, userName, penaltyId }
+
+    // ── Search filter ───────────────────────────────────────────────
+    function filterUsers(value) {
+        const q = (value || '').trim().toLowerCase();
+        let anyVisible = false;
+        document.querySelectorAll('.user-row').forEach(row => {
+            const match = !q || row.dataset.search.includes(q);
+            row.classList.toggle('hidden', !match);
+            if (match) anyVisible = true;
+        });
+        const noRes = document.getElementById('no-results');
+        if (noRes) noRes.classList.toggle('hidden', anyVisible);
+    }
+
+    // ── Click dispatch ──────────────────────────────────────────────
+    document.querySelectorAll('.user-action').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action     = btn.dataset.action;
+            const userId     = btn.dataset.userId;
+            const userName   = btn.dataset.userName || userId;
+            const penaltyId  = btn.dataset.penaltyId;
+
+            pendingAction = { type: action, userId, userName, penaltyId };
+
+            if (action === 'suspend') {
+                openAlertDialog('suspend-alert');
+            } else if (action === 'reactivate') {
+                openAlertDialog('reactivate-alert');
+            } else if (action === 'revoke-penalty') {
+                openAlertDialog('revoke-penalty-alert');
+            } else if (action === 'issue-penalty') {
+                document.getElementById('penalty-user-label').textContent = `${userName} (${userId})`;
+                document.getElementById('penalty-reason').value = '';
+                const today = new Date();
+                const def = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
+                    .toISOString().slice(0, 10);
+                const endInput = document.getElementById('penalty-end-date');
+                endInput.value = def;
+                endInput.min = today.toISOString().slice(0, 10);
+                const errorEl = document.getElementById('penalty-error');
+                errorEl.classList.add('hidden');
+                errorEl.textContent = '';
+                openDialog('penalty-dialog');
+            }
+        });
+    });
+
+    // ── Status change confirm (suspend OR reactivate) ───────────────
+    async function confirmStatusChange() {
+        if (!pendingAction) return;
+        const { type, userId } = pendingAction;
+        const endpoint = type === 'suspend'
+            ? `/api/admin/users/${encodeURIComponent(userId)}/suspend`
+            : `/api/admin/users/${encodeURIComponent(userId)}/reactivate`;
+        closeAlertDialog(type === 'suspend' ? 'suspend-alert' : 'reactivate-alert');
+        await postAction(endpoint);
+    }
+
+    // ── Revoke-penalty confirm ──────────────────────────────────────
+    async function confirmRevokePenalty() {
+        if (!pendingAction || !pendingAction.penaltyId) return;
+        closeAlertDialog('revoke-penalty-alert');
+        await postAction(`/api/admin/penalties/${pendingAction.penaltyId}/revoke`);
+    }
+
+    // ── Issue-penalty form submit ───────────────────────────────────
+    document.getElementById('penalty-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!pendingAction || !pendingAction.userId) return;
+
+        const submitBtn = document.getElementById('penalty-submit');
+        const errorEl   = document.getElementById('penalty-error');
+        submitBtn.disabled    = true;
+        submitBtn.textContent = 'Saving…';
+        errorEl.classList.add('hidden');
+
+        try {
+            const res = await fetch(
+                `/api/admin/users/${encodeURIComponent(pendingAction.userId)}/penalty`,
+                { method: 'POST', body: new FormData(e.target) }
+            );
+            const data = await res.json();
+            if (data.success) {
+                closeDialog('penalty-dialog');
+                if (typeof showToast === 'function') showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 600);
+            } else {
+                errorEl.textContent = data.error || 'Could not issue penalty.';
+                errorEl.classList.remove('hidden');
+                submitBtn.disabled    = false;
+                submitBtn.textContent = 'Issue Penalty';
+            }
+        } catch {
+            errorEl.textContent = 'Network error. Please try again.';
+            errorEl.classList.remove('hidden');
+            submitBtn.disabled    = false;
+            submitBtn.textContent = 'Issue Penalty';
+        }
+    });
+
+    // ── Shared POST helper for the alert-dialog actions ─────────────
+    async function postAction(url) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': CSRF },
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (typeof showToast === 'function') showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 600);
+            } else {
+                if (typeof showToast === 'function') showToast(data.error || 'Action failed.', 'error');
+            }
+        } catch {
+            if (typeof showToast === 'function') showToast('Network error. Please try again.', 'error');
+        }
+    }
+
+    // ── Invite admin flow ───────────────────────────────────────────
+    let pendingInviteId = null;
+
+    function openInviteDialog() {
+        document.getElementById('invite-uid').value = '';
+        document.getElementById('invite-name').value = '';
+        document.getElementById('invite-phone').value = '';
+        const err = document.getElementById('invite-error');
+        err.classList.add('hidden');
+        err.textContent = '';
+        const btn = document.getElementById('invite-submit');
+        btn.disabled = false;
+        btn.textContent = 'Generate invite link';
+        openDialog('invite-dialog');
+    }
+
+    document.getElementById('invite-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('invite-submit');
+        const errorEl   = document.getElementById('invite-error');
+        submitBtn.disabled    = true;
+        submitBtn.textContent = 'Generating…';
+        errorEl.classList.add('hidden');
+
+        try {
+            const res = await fetch('/api/admin/invites', {
+                method: 'POST',
+                body: new FormData(e.target),
+            });
+            const data = await res.json();
+            if (data.success) {
+                closeDialog('invite-dialog');
+                renderInviteLink(data.invite);
+            } else {
+                errorEl.textContent = data.error || 'Could not create invite.';
+                errorEl.classList.remove('hidden');
+                submitBtn.disabled    = false;
+                submitBtn.textContent = 'Generate invite link';
+            }
+        } catch {
+            errorEl.textContent = 'Network error. Please try again.';
+            errorEl.classList.remove('hidden');
+            submitBtn.disabled    = false;
+            submitBtn.textContent = 'Generate invite link';
+        }
+    });
+
+    function renderInviteLink(invite) {
+        document.getElementById('invite-link-target').textContent = `${invite.uname} (${invite.uId})`;
+        const input = document.getElementById('invite-link-url');
+        input.value = invite.signup_url;
+        const copyBtn = document.getElementById('invite-link-copy');
+        copyBtn.innerHTML = copyBtn.dataset.original || copyBtn.innerHTML;
+        copyBtn.dataset.original = copyBtn.innerHTML;
+        openDialog('invite-link-dialog');
+        input.focus();
+        input.select();
+    }
+
+    function showInviteLink(token, uname, uId) {
+        const url = `${window.location.origin}/admin-signup?token=${encodeURIComponent(token)}`;
+        renderInviteLink({ uname, uId, signup_url: url });
+    }
+
+    async function copyInviteLink() {
+        const input = document.getElementById('invite-link-url');
+        const btn   = document.getElementById('invite-link-copy');
+        try {
+            await navigator.clipboard.writeText(input.value);
+            const original = btn.innerHTML;
+            btn.innerHTML = 'Copied!';
+            setTimeout(() => { btn.innerHTML = original; }, 1200);
+        } catch {
+            input.focus();
+            input.select();
+            if (typeof showToast === 'function') showToast('Copy failed — select and copy manually.', 'error');
+        }
+    }
+
+    // ── Revoke invite flow ──────────────────────────────────────────
+    document.querySelectorAll('[data-revoke-invite]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            pendingInviteId = btn.dataset.revokeInvite;
+            openAlertDialog('revoke-invite-alert');
+        });
+    });
+
+    async function confirmRevokeInvite() {
+        if (!pendingInviteId) return;
+        closeAlertDialog('revoke-invite-alert');
+        await postAction(`/api/admin/invites/${pendingInviteId}/revoke`);
+    }
+</script>
 
 {% endblock %}

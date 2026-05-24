@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, redirect, url_for, session, flash
-from forms import LoginForm, SignUpForm
+from flask import Blueprint, render_template, redirect, url_for, session, flash, request
+from forms import LoginForm, SignUpForm, AdminSignUpForm
 from controllers.auth import authenticate_user, register_user
+from controllers.admin_invites import find_invite_by_token, consume_invite
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -49,6 +50,53 @@ def sign_up():
             return redirect(url_for('auth.login'))
 
     return render_template("auth/sign-up.html", form=form, message=message)
+
+
+@auth_bp.route('/admin-signup', methods=['GET', 'POST'])
+def admin_signup():
+    if 'user_id' in session:
+        return redirect(url_for('seats.user_dashboard'))
+
+    # Token can come from the querystring (GET) or the hidden field (POST).
+    token = (request.values.get('token') or '').strip()
+    invite, reason = find_invite_by_token(token)
+
+    form    = AdminSignUpForm()
+    message = ''
+
+    # If the token is unusable, render a stand-alone error view so the user
+    # doesn't see a half-filled form.
+    if not invite:
+        reasons = {
+            'missing': 'This invite link is invalid.',
+            'used':    'This invite has already been used.',
+            'revoked': 'This invite was revoked by an admin.',
+            'expired': 'This invite has expired. Ask an admin for a new one.',
+        }
+        return render_template(
+            'auth/admin-signup.html',
+            form=form,
+            invite=None,
+            token=token,
+            message=reasons.get(reason, 'Invalid invite.'),
+        )
+
+    if request.method == 'POST' and form.validate_on_submit():
+        success, result = consume_invite(token, form.password.data)
+        if not success:
+            message = result
+        else:
+            session['user_id'] = result['uId']
+            flash(f'Welcome, {result["uname"]}!', 'success')
+            return redirect(url_for('admin.admin_dashboard'))
+
+    return render_template(
+        'auth/admin-signup.html',
+        form=form,
+        invite=invite,
+        token=token,
+        message=message,
+    )
 
 
 @auth_bp.route('/logout')

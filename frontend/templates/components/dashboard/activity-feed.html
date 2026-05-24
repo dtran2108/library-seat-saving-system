@@ -1,0 +1,81 @@
+{#
+    ActivityFeed — vertical timeline of recent admin actions.
+
+    Renders one row per event with:
+      - small colored dot (color encodes action category)
+      - "<actor> <verb> <target>" line
+      - relative timestamp (e.g. "5m ago", "2h ago", "yesterday")
+
+    Args:
+      events – list of {actor, actor_id, actionType, target, timestamp}
+               (from controllers.admin.recent_admin_actions)
+
+    Usage:
+        {% from "components/dashboard/activity-feed.html" import ActivityFeed %}
+        {{ ActivityFeed(recent_actions) }}
+#}
+{% macro ActivityFeed(events) %}
+    {%
+        set verb_map = {
+            'block_seat':          'blocked',
+            'unblock_seat':        'unblocked',
+            'cancel_reservation':  'cancelled a booking on',
+            'modify_reservation':  'overrode a booking on',
+            'issue_penalty':       'issued',
+            'revoke_penalty':      'revoked',
+            'suspend_user':        'suspended a user',
+            'reactivate_user':     'reactivated a user',
+        }
+    %}
+    {%
+        set dot_map = {
+            'block_seat':          'bg-amber-500',
+            'unblock_seat':        'bg-emerald-500',
+            'cancel_reservation':  'bg-red-500',
+            'modify_reservation':  'bg-blue-500',
+            'issue_penalty':       'bg-rose-500',
+            'revoke_penalty':      'bg-emerald-500',
+            'suspend_user':        'bg-red-500',
+            'reactivate_user':     'bg-emerald-500',
+        }
+    %}
+
+    <section class="bg-card border border-border rounded-2xl p-4 shadow-sm">
+        <header class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-foreground text-sm">Recent activity</h3>
+            <span class="text-[10px] uppercase tracking-wide text-muted-foreground">Admin log</span>
+        </header>
+
+        {% if not events %}
+            <p class="text-xs text-muted-foreground py-4 text-center">
+                No admin activity yet.
+            </p>
+        {% else %}
+            <ol class="relative flex flex-col gap-3">
+                {# Vertical guide line — sits behind the dots. #}
+                <span aria-hidden="true" class="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-border"></span>
+
+                {% for e in events %}
+                    {% set verb = verb_map.get(e.actionType, e.actionType.replace('_', ' ')) %}
+                    {% set dot  = dot_map.get(e.actionType, 'bg-primary') %}
+                    <li class="relative flex items-start gap-3 pl-4">
+                        <span class="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full ring-2 ring-card {{ dot }}"></span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs text-foreground leading-snug">
+                                <span class="font-medium">{{ e.actor }}</span>
+                                <span class="text-muted-foreground">{{ verb }}</span>
+                                {% if e.target %}<span class="font-medium">{{ e.target }}</span>{% endif %}
+                            </p>
+                            <p
+                                class="text-[10px] text-muted-foreground/80 mt-0.5"
+                                title="{{ e.timestamp_utc }} UTC"
+                            >
+                                {{ e.timestamp }}
+                            </p>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
+        {% endif %}
+    </section>
+{% endmacro %}
