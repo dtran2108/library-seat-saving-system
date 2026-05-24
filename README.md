@@ -738,6 +738,6 @@ A living record of what is done and what still needs to be built. Update this as
 
 ### System Functions
 
-- [ ] Penalty management — log no-shows and automatically suspend users who exceed the limit
-- [ ] Admin action log — record every admin action (account suspend, booking override, seat block) to `admin_action_logs`
+- [x] Penalty management — log no-shows and automatically suspend users who exceed the limit
+- [x] Admin action log — record every admin action (account suspend, booking override, seat block) to `admin_action_logs`
 - [ ] Check-in / check-out logging — write to `check_in_logs` and mark `checkOutTime` on departure
