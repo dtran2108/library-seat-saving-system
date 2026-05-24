@@ -8,6 +8,10 @@ from controllers.admin import (
     unblock_seat,
     get_bookings_for_date,
     override_reservation,
+    list_users,
+    set_user_status,
+    issue_user_penalty,
+    revoke_user_penalty,
 )
 from controllers.seats import cancel_reservation
 
@@ -73,7 +77,55 @@ def api_admin_cancel_reservation(reservation_id):
 @admin_bp.route('/manage-users')
 @admin_required
 def manage_users():
-    return render_template("dashboard/manage-users.html")
+    return render_template(
+        "dashboard/manage-users.html",
+        users=list_users(),
+        current_admin_id=session['user_id'],
+    )
+
+
+@admin_bp.route('/api/admin/users')
+@admin_required
+def api_admin_users():
+    return jsonify(success=True, users=list_users())
+
+
+@admin_bp.route('/api/admin/users/<user_id>/suspend', methods=['POST'])
+@admin_required
+def api_admin_suspend_user(user_id):
+    success, message = set_user_status(user_id, session['user_id'], 'suspended')
+    if success:
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message), 400
+
+
+@admin_bp.route('/api/admin/users/<user_id>/reactivate', methods=['POST'])
+@admin_required
+def api_admin_reactivate_user(user_id):
+    success, message = set_user_status(user_id, session['user_id'], 'active')
+    if success:
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message), 400
+
+
+@admin_bp.route('/api/admin/users/<user_id>/penalty', methods=['POST'])
+@admin_required
+def api_admin_issue_penalty(user_id):
+    reason   = request.form.get('reason', '').strip()
+    end_date = request.form.get('end_date', '').strip()
+    success, message = issue_user_penalty(user_id, session['user_id'], reason, end_date)
+    if success:
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message), 400
+
+
+@admin_bp.route('/api/admin/penalties/<int:penalty_id>/revoke', methods=['POST'])
+@admin_required
+def api_admin_revoke_penalty(penalty_id):
+    success, message = revoke_user_penalty(penalty_id, session['user_id'])
+    if success:
+        return jsonify(success=True, message=message)
+    return jsonify(success=False, error=message), 400
 
 
 @admin_bp.route('/api/admin/block-seat', methods=['POST'])

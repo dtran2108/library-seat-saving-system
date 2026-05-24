@@ -728,11 +728,11 @@ A living record of what is done and what still needs to be built. Update this as
 
 ### Admin — User Management
 
-- [ ] View all registered users — route and template exist (**shell only**, no DB query wired up)
-- [ ] Search or filter users by name or Student ID
-- [ ] View a user's reservation history and no-show count
-- [ ] Suspend a user account (blocks future logins)
-- [ ] Reinstate a suspended account
+- [x] View all registered users — route and template exist (**shell only**, no DB query wired up)
+- [x] Search or filter users by name or Student ID
+- [x] View a user's reservation history and no-show count
+- [x] Suspend a user account (blocks future logins)
+- [x] Reinstate a suspended account
 
 ---
 

@@ -99,6 +99,31 @@ def _recompute_seat_status(seat_id, when_text=None):
     )
 
 
+def _active_penalty_for_user(user_id):
+    """Return the user's current active penalty row, or None. Expires any
+    stale penalties first so a row past its endDate never blocks a booking."""
+    today = datetime.now().strftime('%Y-%m-%d')
+    db = get_db()
+    db.execute(
+        "UPDATE penalties SET status = 'expired' WHERE status = 'active' AND endDate < ?",
+        (today,),
+    )
+    db.commit()
+
+    return query_db(
+        """
+        SELECT p.penaltyId, p.reason, p.endDate
+        FROM penalties p
+        JOIN reservations r ON r.reservationId = p.reservationId
+        WHERE r.uId = ?
+        AND p.status = 'active'
+        LIMIT 1
+        """,
+        (user_id,),
+        one=True,
+    )
+
+
 # ─── Input validation ────────────────────────────────────────────────────
 def _validate_window(booking_date, start_time, duration):
     """Parse (booking_date, start_time, duration) into datetimes. Returns
@@ -351,6 +376,13 @@ def book_seat(user_id, seat_id, booking_date, start_time, duration):
 
     if _get_user_daily_hours(user_id, booking_date) + duration > MAX_HOURS_PER_DAY:
         return False, f'You can book at most {MAX_HOURS_PER_DAY} hours per day.'
+
+    penalty = _active_penalty_for_user(user_id)
+    if penalty:
+        return False, (
+            f'Booking blocked: you have an active penalty until '
+            f'{penalty["endDate"]} ({penalty["reason"]}).'
+        )
 
     seat = query_db(
         """
