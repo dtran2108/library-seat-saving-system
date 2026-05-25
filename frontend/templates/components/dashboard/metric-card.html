@@ -1,0 +1,107 @@
+{#
+    MetricCard — single-metric card with optional delta + optional sparkline.
+
+    Args:
+      id        – DOM id for the canvas (required if `series` is provided)
+      label     – uppercase muted label
+      value     – the big number / value to show
+      delta     – integer change vs the prior period (positive/negative/0)
+      series    – list of {label, count} dicts for the trailing sparkline
+      inverted  – flip delta colors (used for "no-shows" where up = bad)
+      empty     – text shown when `value` is None/0 and there is no series
+
+    Usage:
+        {% from "components/dashboard/metric-card.html" import MetricCard %}
+        {{ MetricCard(id="bookings-sparkline",
+                      label="Bookings today",
+                      value=kpis.bookings_today,
+                      delta=kpis.bookings_delta,
+                      series=bookings_series) }}
+#}
+{% macro MetricCard(id, label, value, delta=None, series=None, inverted=False, empty="—", class="") %}
+<section class="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col {{ class }}">
+    <p class="text-xs uppercase tracking-wide text-muted-foreground">{{ label }}</p>
+
+    <div class="flex items-baseline justify-between gap-2 mt-1">
+        <p class="text-2xl font-bold text-foreground font-mono tabular-nums">
+            {{ value if value is not none else empty }}
+        </p>
+        {% if delta is not none %}
+            {# Up arrow = positive delta. Color logic depends on whether the
+               metric is "good when rising" (bookings) or "bad when rising"
+               (no-shows, configured via inverted=True). #}
+            {% if delta > 0 %}
+                {% set tone = 'text-red-600' if inverted else 'text-green-700' %}
+                <span class="text-xs font-medium {{ tone }}">↑ {{ delta }}</span>
+            {% elif delta < 0 %}
+                {% set tone = 'text-green-700' if inverted else 'text-red-600' %}
+                <span class="text-xs font-medium {{ tone }}">↓ {{ -delta }}</span>
+            {% else %}
+                <span class="text-xs font-medium text-muted-foreground">→ 0</span>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    {% if series %}
+        <div class="relative h-10 mt-2 -mx-1">
+            <canvas id="{{ id }}"></canvas>
+        </div>
+    {% elif delta is not none %}
+        <p class="text-xs text-muted-foreground mt-2">vs yesterday</p>
+    {% endif %}
+</section>
+
+{% if series %}
+<script>
+    (function() {
+        const canvas = document.getElementById({{ id | tojson }});
+        if (!canvas) return;
+        const ctx     = canvas.getContext('2d');
+        const styles  = getComputedStyle(document.documentElement);
+        const primary = (styles.getPropertyValue('--color-primary').trim()) || 'hsl(25 60% 45%)';
+        const series  = {{ series | tojson }};
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 40);
+        gradient.addColorStop(0, primary.replace(/\)$/, ' / 0.30)'));
+        gradient.addColorStop(1, primary.replace(/\)$/, ' / 0)'));
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: series.map(p => p.label),
+                datasets: [{
+                    data: series.map(p => p.count),
+                    borderColor: primary,
+                    backgroundColor: gradient,
+                    borderWidth: 1.75,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    pointHoverBackgroundColor: primary,
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 1.5,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        displayColors: false,
+                        backgroundColor: 'hsl(25 20% 15%)',
+                        padding: 6,
+                        cornerRadius: 6,
+                        bodyFont: { size: 11 },
+                        titleFont: { size: 11 },
+                    },
+                },
+                scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
+            },
+        });
+    })();
+</script>
+{% endif %}
+{% endmacro %}

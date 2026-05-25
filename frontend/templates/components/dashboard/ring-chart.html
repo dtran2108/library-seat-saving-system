@@ -1,0 +1,113 @@
+{#
+    RingChart — Chart.js doughnut with an inline center label + below-chart
+    legend list. Renders an empty state when every slice is zero.
+
+    Args:
+      id            – DOM id for the canvas
+      title         – section heading
+      series        – list of {label, count} dicts
+      subtitle      – small muted text under the title
+      center_label  – uppercase label inside the donut hole
+      center_value  – big value inside the donut hole
+
+    Usage:
+        {% from "components/dashboard/ring-chart.html" import RingChart %}
+        {{ RingChart(id="peak-forecast",
+                     title="Peak hours forecast",
+                     subtitle="Last 30 days · bookings by time-of-day",
+                     series=peak_forecast,
+                     center_label="Peak today",
+                     center_value=kpis.peak_hour or "—") }}
+#}
+{% macro RingChart(id, title, series, subtitle="", center_label=None, center_value=None, class="") %}
+{% set total = series | sum(attribute='count') %}
+<section class="bg-card border border-border rounded-2xl p-5 shadow-sm h-full flex flex-col {{ class }}">
+    <header class="mb-3">
+        <h2 class="font-semibold text-foreground">{{ title }}</h2>
+        {% if subtitle %}
+            <p class="text-xs text-muted-foreground mt-0.5">{{ subtitle }}</p>
+        {% endif %}
+    </header>
+
+    {% if total == 0 %}
+        <div class="flex-1 flex flex-col items-center justify-center text-center py-8">
+            <p class="text-sm text-muted-foreground">No bookings yet to forecast from.</p>
+            <p class="text-xs text-muted-foreground/70 mt-1">Once activity ramps up, peak windows will appear here.</p>
+        </div>
+    {% else %}
+        <div class="relative flex-1 min-h-[11rem] mb-3">
+            <canvas id="{{ id }}"></canvas>
+            {% if center_value is not none %}
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    {% if center_label %}
+                        <p class="text-[10px] uppercase tracking-wider text-muted-foreground">{{ center_label }}</p>
+                    {% endif %}
+                    <p class="text-xl font-bold text-foreground font-mono tabular-nums leading-tight">{{ center_value }}</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <ul class="space-y-1.5 text-xs">
+            {% for slice in series %}
+                {% set palette = ['hsl(25 60% 45%)', 'hsl(160 45% 50%)', 'hsl(35 75% 55%)', 'hsl(200 50% 55%)', 'hsl(280 40% 60%)'] %}
+                {% set color = palette[loop.index0 % palette|length] %}
+                {% set pct = ((100 * slice.count / total) | round | int) if total else 0 %}
+                <li class="flex items-center justify-between gap-2">
+                    <span class="flex items-center gap-2 min-w-0">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {{ color }}"></span>
+                        <span class="text-foreground truncate">{{ slice.label }}</span>
+                    </span>
+                    <span class="text-muted-foreground font-mono tabular-nums shrink-0">{{ pct }}%</span>
+                </li>
+            {% endfor %}
+        </ul>
+
+        <script>
+            (function() {
+                const canvas = document.getElementById({{ id | tojson }});
+                if (!canvas) return;
+                const ctx    = canvas.getContext('2d');
+                const series = {{ series | tojson }};
+                const palette = ['hsl(25 60% 45%)', 'hsl(160 45% 50%)', 'hsl(35 75% 55%)', 'hsl(200 50% 55%)', 'hsl(280 40% 60%)'];
+                const colors = series.map((_, i) => palette[i % palette.length]);
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: series.map(p => p.label),
+                        datasets: [{
+                            data: series.map(p => p.count),
+                            backgroundColor: colors,
+                            borderColor: '#fff',
+                            borderWidth: 3,
+                            hoverOffset: 6,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '68%',
+                        rotation: -90,
+                        plugins: {
+                            legend:  { display: false },
+                            tooltip: {
+                                displayColors: false,
+                                backgroundColor: 'hsl(25 20% 15%)',
+                                padding: 8,
+                                cornerRadius: 6,
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                        const pct = total ? Math.round(100 * ctx.parsed / total) : 0;
+                                        return `${ctx.parsed} bookings · ${pct}%`;
+                                    },
+                                },
+                            },
+                        },
+                    },
+                });
+            })();
+        </script>
+    {% endif %}
+</section>
+{% endmacro %}

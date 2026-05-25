@@ -2,116 +2,63 @@
 
 {# Import Macros #}
 {% from "components/ui/icon.html" import Icon %}
-{% from "components/ui/button.html" import Button %}
-{% from "components/ui/page-header.html" import PageHeader %}
 {% from "components/ui/date-picker.html" import DatePicker %}
 {% from "components/ui/popover.html" import Popover %}
 {% from "components/ui/dialog.html" import Dialog %}
 {% from "components/ui/alert-dialog.html" import AlertDialog %}
-{% from "components/ui/tabs.html" import Tabs %}
-{% from "components/stat-card.html" import StatCard, EmptyState %}
 {% from "components/ui/badge.html" import Badge %}
+{% from "components/dashboard/trend-chart.html" import TrendChart %}
+{% from "components/dashboard/gauge-widget.html" import GaugeWidget %}
+{% from "components/dashboard/metric-card.html" import MetricCard %}
+{% from "components/dashboard/ring-chart.html" import RingChart %}
+{% from "components/dashboard/zone-card.html" import ZoneCard %}
+{% from "components/dashboard/activity-feed.html" import ActivityFeed %}
 
 
 {# ─────────────────────────────────────────────────────────────────────
    Local macros
    ───────────────────────────────────────────────────────────────────── #}
 
-{# A single booking row in the Bookings tab. #}
+{# A single booking row in the bookings data table. #}
 {% macro BookingRow(b) %}
-    <div id="booking-row-{{ b.reservationId }}" class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div class="flex flex-col gap-1">
-            <div class="flex items-center gap-2 flex-wrap">
-                {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
-                <span class="font-semibold text-foreground">{{ b.seat_label }}</span>
-                {{ Badge(b.status) }}
-            </div>
-            <p class="text-sm text-muted-foreground ml-6">
-                {{ b.user_label }}
-            </p>
-            <p class="text-sm text-muted-foreground ml-6">
-                {{ b.start_time }} – {{ b.end_time }}
-            </p>
-        </div>
-
-        {% if b.status in ('upcoming', 'active') %}
-            <div class="flex gap-2 shrink-0">
+    {% set actionable = b.status in ('upcoming', 'active') %}
+    <tr
+        id="booking-row-{{ b.reservationId }}"
+        class="booking-row hover:bg-muted/30 transition-colors"
+        data-status="{{ b.status }}"
+    >
+        <td class="px-4 py-3 whitespace-nowrap text-foreground font-mono text-xs">
+            {{ b.start_time }}–{{ b.end_time }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap">
+            <span class="font-medium text-foreground">{{ b.seat_label }}</span>
+        </td>
+        <td class="px-4 py-3 text-muted-foreground">{{ b.user_label }}</td>
+        <td class="px-4 py-3">{{ Badge(b.status) }}</td>
+        <td class="px-4 py-3 text-right">
+            {% if actionable %}
                 <button
                     type="button"
-                    data-override-id="{{ b.reservationId }}"
+                    data-action-trigger="{{ b.reservationId }}"
                     data-seat-label="{{ b.seat_label }}"
                     data-user-label="{{ b.user_label }}"
                     data-booking-date="{{ b.booking_date }}"
                     data-start-time="{{ b.start_time }}"
                     data-duration="{{ b.duration }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-primary/30 bg-transparent shadow-sm hover:bg-primary/5 text-primary h-8 px-3"
+                    onclick="openBookingActions(this)"
+                    title="Actions"
+                    class="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    aria-label="Booking actions"
                 >
-                    {{ Icon('clock', class="w-4 h-4 mr-1") }}
-                    Override Time
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="5"  r="1.5"/>
+                        <circle cx="12" cy="12" r="1.5"/>
+                        <circle cx="12" cy="19" r="1.5"/>
+                    </svg>
                 </button>
-                <button
-                    type="button"
-                    data-cancel-id="{{ b.reservationId }}"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-destructive/30 bg-transparent shadow-sm hover:bg-destructive/5 text-destructive h-8 px-3"
-                >
-                    {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
-                    Cancel
-                </button>
-            </div>
-        {% endif %}
-    </div>
-{% endmacro %}
-
-
-{# One zone block in the Manage Seats tab — header + seat-button grid. #}
-{% macro ZoneSection(zone) %}
-    <div>
-        <div class="flex items-center justify-between mb-2">
-            <div>
-                <p class="text-sm font-semibold text-foreground">{{ zone.name }}</p>
-                <p class="text-xs text-muted-foreground">{{ zone.location }}</p>
-            </div>
-            {% if zone.zone_status == 'maintenance' %}
-                <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Zone closed</span>
             {% endif %}
-        </div>
-
-        {# Plaza floor plan image — for Learning Plaza A & B #}
-        {% if zone.name == 'Learning Plaza A' %}
-            <div class="mb-3">
-                <img
-                    src="{{ url_for('static', filename='plazaA.jpg') }}"
-                    alt="Learning Plaza A Floor Plan"
-                    class="w-full h-auto rounded-lg border border-border shadow-sm"
-                />
-            </div>
-        {% elif zone.name == 'Learning Plaza B' %}
-            <div class="mb-3">
-                <img
-                    src="{{ url_for('static', filename='plazaB.jpg') }}"
-                    alt="Learning Plaza B Floor Plan"
-                    class="w-full h-auto rounded-lg border border-border shadow-sm"
-                />
-            </div>
-        {% endif %}
-
-        <div class="flex flex-wrap gap-2">
-            {% for seat in zone.seats %}
-                {% set status_class = "bg-amber-50 border-amber-400 text-amber-700" if seat.status == 'blocked' else "bg-green-50 border-green-300 text-green-700" %}
-                {# data-number carries the full label for the popover #}
-                <button
-                    type="button"
-                    class="seat-btn w-12 h-12 rounded-xl border-2 text-xs font-semibold transition-all duration-150 hover:scale-105 {{ status_class }}"
-                    data-id="{{ seat.seatId }}"
-                    data-number="{{ zone.name }} · {{ seat.deskNo }}"
-                    data-status="{{ seat.status }}"
-                    onclick="openSeatPopover(this)"
-                >
-                    {{ seat.deskNo }}
-                </button>
-            {% endfor %}
-        </div>
-    </div>
+        </td>
+    </tr>
 {% endmacro %}
 
 
@@ -119,101 +66,206 @@
 
 {% block content %}
 
-    {% set active_bookings = bookings | selectattr("status", "in", ["upcoming", "active"]) | list | length %}
+    <div class="p-6 max-w-6xl mx-auto">
 
-    <div class="p-6 max-w-5xl mx-auto">
-        {{ PageHeader("Admin Panel", "Manage bookings and seats.", icon="settings") }}
-
-        {# ── Stat cards ───────────────────────────────────────────────── #}
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-            {{ StatCard("Total Seats", total_seats) }}
-            {{ StatCard("Blocked Seats", blocked_seats, color="text-amber-600", value_id="blocked-seats-count") }}
-            {{ StatCard("Bookings on " ~ selected_date, active_bookings, color="text-primary", value_id="bookings-on-date-count") }}
+        {# ── Page header: title + booking-system status pill ───────────── #}
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <div>
+                <h1 class="font-playfair text-2xl font-bold text-foreground flex items-center gap-2">
+                    {{ Icon('layout-dashboard', class="w-6 h-6 text-primary") }}
+                    Today at the library
+                </h1>
+                <p class="text-sm text-muted-foreground mt-1">{{ selected_date }}</p>
+            </div>
+            {# Booking-system kill switch — labeled Switch is the universal
+               affordance for a binary system-wide toggle (shadcn/ui pattern).
+               The label is to the left of the switch so it reads as a setting,
+               not a status badge. The state word below the label confirms
+               what's happening in plain English. #}
+            <div class="flex items-center gap-3 shrink-0 rounded-2xl border border-border bg-card px-4 py-2.5 shadow-sm">
+                <div class="text-right select-none">
+                    <p id="booking-system-label" class="text-sm font-medium text-foreground leading-tight">
+                        Accept new bookings
+                    </p>
+                    <p class="text-xs leading-tight mt-0.5">
+                        <span id="booking-system-state" class="font-semibold {{ 'text-green-700' if booking_enabled else 'text-red-700' }}">
+                            {{ 'Enabled' if booking_enabled else 'Disabled' }}
+                        </span>
+                        <span class="text-muted-foreground">· click to toggle</span>
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    id="booking-system-toggle"
+                    role="switch"
+                    aria-checked="{{ 'true' if booking_enabled else 'false' }}"
+                    aria-labelledby="booking-system-label"
+                    data-enabled="{{ 'true' if booking_enabled else 'false' }}"
+                    onclick="toggleBookingSystem()"
+                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-green-500' if booking_enabled else 'bg-gray-300' }}"
+                >
+                    <span
+                        id="booking-system-thumb"
+                        class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform {{ 'translate-x-5' if booking_enabled else 'translate-x-0' }}"
+                    ></span>
+                </button>
+            </div>
         </div>
 
-        {# ── Tabs ────────────────────────────────────────────────────── #}
-        {% call(tab) Tabs(
-            tabs=["bookings", "seats"],
-            labels={"bookings": "Bookings", "seats": "Manage Seats"},
-            default="bookings",
-            id="admin-tabs"
-        ) %}
+        {# ── Hero row: trends + peak-hour forecast (always same row ≥ md) #}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-stretch">
+            <div class="md:col-span-2 min-w-0">
+                {{ TrendChart(
+                    id="occupancy-trend",
+                    title="Occupancy trends",
+                    subtitle="Concurrent reservations · last 24 hours",
+                    series=hourly_bookings,
+                    height_class="h-64"
+                ) }}
+            </div>
+            <div class="md:col-span-1 min-w-0">
+                {{ RingChart(
+                    id="peak-forecast",
+                    title="Peak hours forecast",
+                    subtitle="Last 30 days · bookings by time-of-day",
+                    series=peak_forecast,
+                    center_label="Peak today",
+                    center_value=kpis.peak_hour or "—"
+                ) }}
+            </div>
+        </div>
 
-            {% if tab == "bookings" %}
-                {{ DatePicker(id="bookings-date", value=selected_date, wrapper_class="mb-4") }}
+        {# ── KPI strip ─────────────────────────────────────────────────── #}
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            {{ GaugeWidget(
+                id="occupancy-gauge",
+                label="Occupancy",
+                value=kpis.occupancy_pct,
+                subtitle=kpis.occupied ~ " of " ~ kpis.usable_total ~ " usable seats",
+                warn_at=85
+            ) }}
 
-                <div id="bookings-list">
+            {{ MetricCard(
+                id="bookings-sparkline",
+                label="Bookings today",
+                value=kpis.bookings_today,
+                delta=kpis.bookings_delta,
+                series=bookings_series
+            ) }}
+
+            {{ MetricCard(
+                id="no-shows-sparkline",
+                label="No-shows today",
+                value=kpis.no_show_today,
+                delta=kpis.no_show_delta,
+                series=no_show_series,
+                inverted=True
+            ) }}
+
+            {{ MetricCard(
+                id="active-now-card",
+                label="Active right now",
+                value=kpis.active_now
+            ) }}
+        </div>
+
+        {# ── Body: bookings table (2/3) + Now sidecar (1/3) ──────────── #}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <section class="lg:col-span-2 bg-card border border-border rounded-2xl overflow-hidden">
+                <header class="px-4 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h2 class="font-semibold text-foreground">Bookings</h2>
+                        {{ DatePicker(id="bookings-date", value=selected_date, label=None) }}
+                    </div>
+                    <div class="flex gap-1.5 flex-wrap" id="booking-filters">
+                        <button type="button" data-filter="all"      class="booking-filter px-3 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground transition-colors">All</button>
+                        <button type="button" data-filter="upcoming" class="booking-filter px-3 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground hover:bg-muted transition-colors">Upcoming</button>
+                        <button type="button" data-filter="active"   class="booking-filter px-3 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground hover:bg-muted transition-colors">Active</button>
+                        <button type="button" data-filter="issues"   class="booking-filter px-3 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground hover:bg-muted transition-colors">Issues</button>
+                    </div>
+                </header>
+
+                <div id="bookings-list" class="overflow-x-auto">
                     {% if not bookings %}
-                        {{ EmptyState("No bookings on this date.") }}
+                        <div id="bookings-empty" class="px-4 py-10 text-center text-sm text-muted-foreground">No bookings on this date.</div>
                     {% else %}
-                        <div class="flex flex-col gap-3">
-                            {% for b in bookings %}
-                                {{ BookingRow(b) }}
-                            {% endfor %}
-                        </div>
+                        <table class="w-full text-sm">
+                            <thead class="bg-muted/40">
+                                <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                    <th class="px-4 py-2.5 font-medium">Time</th>
+                                    <th class="px-4 py-2.5 font-medium">Seat</th>
+                                    <th class="px-4 py-2.5 font-medium">User</th>
+                                    <th class="px-4 py-2.5 font-medium">Status</th>
+                                    <th class="px-4 py-2.5 font-medium text-right"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border" id="bookings-tbody">
+                                {% for b in bookings %}
+                                    {{ BookingRow(b) }}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <p id="bookings-empty-filter" class="hidden px-4 py-10 text-center text-sm text-muted-foreground">No bookings match this filter.</p>
                     {% endif %}
                 </div>
 
                 <template id="booking-row-template">
-                    <div class="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div class="flex flex-col gap-1">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                {{ Icon('map-pin', class="w-4 h-4 text-primary") }}
-                                <span class="font-semibold text-foreground" data-slot="seat-label"></span>
-                                <span data-slot="status-badge" class="px-2 py-0.5 rounded-full text-xs font-medium capitalize"></span>
-                            </div>
-                            <p class="text-sm text-muted-foreground ml-6" data-slot="user-label"></p>
-                            <p class="text-sm text-muted-foreground ml-6" data-slot="time-range"></p>
-                        </div>
-                        <div class="flex gap-2 shrink-0" data-slot="actions">
-                            <button
-                                type="button"
-                                data-slot="override-btn"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-primary/30 bg-transparent shadow-sm hover:bg-primary/5 text-primary h-8 px-3"
-                            >
-                                {{ Icon('clock', class="w-4 h-4 mr-1") }}
-                                Override Time
-                            </button>
-                            <button
-                                type="button"
-                                data-slot="cancel-btn"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-destructive/30 bg-transparent shadow-sm hover:bg-destructive/5 text-destructive h-8 px-3"
-                            >
-                                {{ Icon('calendar-x', class="w-4 h-4 mr-1") }}
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
+                    <tr class="booking-row hover:bg-muted/30 transition-colors">
+                        <td class="px-4 py-3 whitespace-nowrap text-foreground font-mono text-xs" data-slot="time-range"></td>
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="font-medium text-foreground" data-slot="seat-label"></span>
+                        </td>
+                        <td class="px-4 py-3 text-muted-foreground" data-slot="user-label"></td>
+                        <td class="px-4 py-3">
+                            <span data-slot="status-badge" class="px-2 py-0.5 rounded-full text-xs font-medium capitalize"></span>
+                        </td>
+                        <td class="px-4 py-3 text-right" data-slot="actions-cell"></td>
+                    </tr>
                 </template>
+            </section>
 
-            {% elif tab == "seats" %}
-                <div class="bg-card border border-border rounded-2xl p-6">
-                    {# Legend #}
-                    <div class="flex gap-4 mb-5 text-xs font-medium text-foreground">
-                        <span class="flex items-center gap-1.5">
-                            <span class="w-4 h-4 rounded bg-green-50 border-2 border-green-300 inline-block"></span>
-                            Available
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                            <span class="w-4 h-4 rounded bg-amber-50 border-2 border-amber-400 inline-block"></span>
-                            Blocked
-                        </span>
-                    </div>
-                    <p class="text-xs text-muted-foreground mb-4">Click a seat to block or unblock it.</p>
-
-                    {% if not zones %}
-                        <p class="text-sm text-muted-foreground text-center py-6">No zones configured yet.</p>
-                    {% else %}
-                        <div class="flex flex-col gap-6">
-                            {% for zone in zones %}
-                                {{ ZoneSection(zone) }}
-                            {% endfor %}
+            <aside class="lg:col-span-1 flex flex-col gap-4">
+                {# Per-zone summary: live availability + most-booked named seats #}
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-end justify-between px-1">
+                        <div>
+                            <h2 class="text-sm font-semibold text-foreground">Zones</h2>
+                            <p class="text-[11px] text-muted-foreground">Live availability + 30-day patterns</p>
                         </div>
-                    {% endif %}
+                        <span class="text-xs text-muted-foreground">{{ kpis.active_now }} active now</span>
+                    </div>
+                    {% for z in zone_summaries %}
+                        {{ ZoneCard(z) }}
+                    {% endfor %}
                 </div>
-            {% endif %}
 
-        {% endcall %}
+                {# Recent admin activity feed #}
+                {{ ActivityFeed(recent_actions) }}
+
+                {# Quick actions stay at the bottom for navigation #}
+                <div class="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                    <h2 class="font-semibold text-foreground text-sm mb-3">Quick actions</h2>
+                    <div class="flex flex-col gap-1">
+                        <a href="{{ url_for('admin.manage_users') }}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">
+                            <span class="flex items-center gap-2">
+                                {{ Icon('users', class="w-4 h-4 text-primary") }}
+                                Manage users
+                            </span>
+                            {{ Icon('arrow-right', class="w-4 h-4 text-muted-foreground") }}
+                        </a>
+                        <a href="{{ url_for('admin.manage_seats') }}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted transition-colors">
+                            <span class="flex items-center gap-2">
+                                {{ Icon('map', class="w-4 h-4 text-primary") }}
+                                Manage seats
+                            </span>
+                            {{ Icon('arrow-right', class="w-4 h-4 text-muted-foreground") }}
+                        </a>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
     </div>
 
     {# ── Override-reservation dialog ──────────────────────────────────── #}
@@ -295,112 +347,40 @@
         confirm_onclick="confirmCancelBooking()",
     ) }}
 
-    {# ── Seat action popover ─────────────────────────────────────────── #}
-    {# Lives outside the tab panels so it's always reachable from JS, even
-       though it's only triggered from the seats tab.                     #}
-    {% call Popover(id="seat-popover", width_class="w-56") %}
-        <div class="mb-3">
-            <p class="font-semibold text-foreground text-sm" id="seat-popover-name">Seat --</p>
-            <p class="text-xs text-muted-foreground capitalize" id="seat-popover-status">Status: --</p>
-        </div>
-        <form method="POST" id="seat-popover-form" onsubmit="return submitSeatAction(event)">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-            <input type="hidden" name="seat_id" id="seat-popover-seat-id" value="" />
+    {# ── Disable booking system alert dialog ─────────────────────────── #}
+    {{ AlertDialog(
+        id="disable-booking-alert",
+        title="Disable the booking system?",
+        description="Users won't be able to make new reservations until you re-enable. Existing bookings and check-ins continue to work.",
+        confirm_label="Disable bookings",
+        cancel_label="Keep it on",
+        confirm_onclick="performBookingSystemToggle(false)",
+    ) }}
+
+    {# ── Booking row actions popover (Override / Cancel) ─────────────── #}
+    {% call Popover(id="booking-actions-popover", width_class="w-44") %}
+        <div class="flex flex-col gap-1">
             <button
-                type="submit"
-                id="seat-popover-action"
-                data-action="block"
-                class="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-9 px-4 py-2 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                type="button"
+                id="booking-actions-override"
+                class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
             >
-                <span data-icon="block">{{ Icon('lock', class="w-4 h-4") }}</span>
-                <span data-icon="unblock" class="hidden">{{ Icon('unlock', class="w-4 h-4") }}</span>
-                <span id="seat-popover-action-label">Block Seat</span>
+                {{ Icon('clock', class="w-4 h-4 text-primary") }}
+                Override time
             </button>
-        </form>
+            <button
+                type="button"
+                id="booking-actions-cancel"
+                class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors text-left"
+            >
+                {{ Icon('calendar-x', class="w-4 h-4") }}
+                Cancel booking
+            </button>
+        </div>
     {% endcall %}
 
     <script>
-        // ── Seat button palettes (restored after a status change) ────────
-        const SEAT_AVAILABLE_CLASS = "bg-green-50 border-green-300 text-green-700".split(" ");
-        const SEAT_BLOCKED_CLASS   = "bg-amber-50 border-amber-400 text-amber-700".split(" ");
-
-        // ── Popover action-button palettes ───────────────────────────────
-        const ACTION_BLOCK_CLASS   = "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90".split(" ");
-        const ACTION_UNBLOCK_CLASS = "border border-green-400 bg-transparent text-green-700 shadow-sm hover:bg-green-50".split(" ");
-
-        // The seat the popover is currently anchored to.
-        let activeSeatBtn = null;
-
-        // ── Open the popover anchored to a clicked seat ──────────────────
-        function openSeatPopover(seatBtn) {
-            // Clicking the same seat twice closes the popover.
-            if (activeSeatBtn === seatBtn && isPopoverOpen("seat-popover")) {
-                closePopover("seat-popover");
-                activeSeatBtn = null;
-                return;
-            }
-            activeSeatBtn = seatBtn;
-
-            const isBlocked = seatBtn.getAttribute("data-status") === "blocked";
-
-            document.getElementById("seat-popover-name").textContent   = seatBtn.getAttribute("data-number");
-            document.getElementById("seat-popover-status").textContent = "Status: " + seatBtn.getAttribute("data-status");
-            document.getElementById("seat-popover-seat-id").value      = seatBtn.getAttribute("data-id");
-
-            setPopoverActionMode(isBlocked ? "unblock" : "block");
-            openPopover("seat-popover", seatBtn);
-        }
-
-        // ── Configure the popover's action button for block vs. unblock ──
-        function setPopoverActionMode(mode) {
-            const actionBtn = document.getElementById("seat-popover-action");
-            const isUnblock = mode === "unblock";
-
-            actionBtn.disabled = false;
-            actionBtn.dataset.action = mode;
-
-            actionBtn.classList.remove(...ACTION_BLOCK_CLASS, ...ACTION_UNBLOCK_CLASS);
-            actionBtn.classList.add(...(isUnblock ? ACTION_UNBLOCK_CLASS : ACTION_BLOCK_CLASS));
-
-            document.querySelector('[data-icon="block"]').classList.toggle("hidden", isUnblock);
-            document.querySelector('[data-icon="unblock"]').classList.toggle("hidden", !isUnblock);
-            document.getElementById("seat-popover-action-label").textContent =
-                isUnblock ? "Unblock Seat" : "Block Seat";
-        }
-
-        // ── Submit Block / Unblock via fetch ─────────────────────────────
-        async function submitSeatAction(event) {
-            event.preventDefault();
-            const form      = event.target;
-            const submitBtn = document.getElementById("seat-popover-action");
-            const isUnblock = submitBtn.dataset.action === "unblock";
-            const endpoint  = isUnblock ? "/api/admin/unblock-seat" : "/api/admin/block-seat";
-
-            submitBtn.disabled = true;
-
-            try {
-                const res  = await fetch(endpoint, { method: "POST", body: new FormData(form) });
-                const data = await res.json();
-
-                if (data.success) {
-                    onSeatStatusChanged(activeSeatBtn, isUnblock ? "available" : "blocked");
-                    closePopover("seat-popover");
-                    activeSeatBtn = null;
-                    if (typeof showToast === "function") showToast(data.message, "success");
-                } else {
-                    if (typeof showToast === "function") {
-                        showToast(data.error || "Action failed.", "error");
-                    }
-                    submitBtn.disabled = false;
-                }
-            } catch {
-                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
-                submitBtn.disabled = false;
-            }
-            return false;
-        }
-
-        // ── Bookings tab: load by date, render rows, open override dialog ─
+        // ── Bookings: load by date, render rows, open override dialog ─
         const BADGE_STYLES = {
             upcoming:  "bg-secondary text-secondary-foreground",
             active:    "bg-green-100 text-green-700",
@@ -409,59 +389,164 @@
             no_show:   "bg-red-100 text-red-600",
         };
 
+        // Builds the action-trigger button for a row; reused by initial render
+        // and re-render after a date change.
+        function buildBookingActionTrigger(b) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.dataset.actionTrigger = b.reservationId;
+            btn.dataset.seatLabel     = b.seat_label;
+            btn.dataset.userLabel     = b.user_label;
+            btn.dataset.bookingDate   = b.booking_date;
+            btn.dataset.startTime     = b.start_time;
+            btn.dataset.duration      = b.duration;
+            btn.title = "Actions";
+            btn.setAttribute("aria-label", "Booking actions");
+            btn.className = "inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors";
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>';
+            btn.addEventListener("click", () => openBookingActions(btn));
+            return btn;
+        }
+
         function renderBookings(bookings) {
             const list = document.getElementById("bookings-list");
             if (!list) return;
 
             if (!bookings.length) {
-                list.innerHTML = '<div class="bg-card border border-border rounded-2xl p-10 text-center text-muted-foreground">No bookings on this date.</div>';
-                updateBookingsStat(0);
+                list.innerHTML = '<div id="bookings-empty" class="px-4 py-10 text-center text-sm text-muted-foreground">No bookings on this date.</div>';
                 return;
             }
 
-            const tpl = document.getElementById("booking-row-template");
-            const wrap = document.createElement("div");
-            wrap.className = "flex flex-col gap-3";
+            const tpl   = document.getElementById("booking-row-template");
+            const tbody = document.createElement("tbody");
+            tbody.className = "divide-y divide-border";
+            tbody.id        = "bookings-tbody";
 
             for (const b of bookings) {
-                const node = tpl.content.firstElementChild.cloneNode(true);
-                node.id = `booking-row-${b.reservationId}`;
-                node.querySelector('[data-slot="seat-label"]').textContent = b.seat_label;
-                node.querySelector('[data-slot="user-label"]').textContent = b.user_label;
-                node.querySelector('[data-slot="time-range"]').textContent = `${b.start_time} – ${b.end_time}`;
+                const tr = tpl.content.firstElementChild.cloneNode(true);
+                tr.id = `booking-row-${b.reservationId}`;
+                tr.dataset.status = b.status;
 
-                const badge = node.querySelector('[data-slot="status-badge"]');
+                tr.querySelector('[data-slot="seat-label"]').textContent = b.seat_label;
+                tr.querySelector('[data-slot="user-label"]').textContent = b.user_label;
+                tr.querySelector('[data-slot="time-range"]').textContent = `${b.start_time}–${b.end_time}`;
+
+                const badge = tr.querySelector('[data-slot="status-badge"]');
                 badge.textContent = b.status;
                 badge.className = `px-2 py-0.5 rounded-full text-xs font-medium capitalize ${BADGE_STYLES[b.status] || BADGE_STYLES.upcoming}`;
 
-                const overrideBtn = node.querySelector('[data-slot="override-btn"]');
-                const cancelBtn   = node.querySelector('[data-slot="cancel-btn"]');
-                const actions     = node.querySelector('[data-slot="actions"]');
+                const actionsCell = tr.querySelector('[data-slot="actions-cell"]');
                 if (b.status === "upcoming" || b.status === "active") {
-                    overrideBtn.dataset.overrideId  = b.reservationId;
-                    overrideBtn.dataset.seatLabel   = b.seat_label;
-                    overrideBtn.dataset.userLabel   = b.user_label;
-                    overrideBtn.dataset.bookingDate = b.booking_date;
-                    overrideBtn.dataset.startTime   = b.start_time;
-                    overrideBtn.dataset.duration    = b.duration;
-                    overrideBtn.addEventListener("click", () => openOverrideDialog(overrideBtn));
-
-                    cancelBtn.dataset.cancelId = b.reservationId;
-                    cancelBtn.addEventListener("click", () => cancelBooking(cancelBtn));
-                } else {
-                    actions.remove();
+                    actionsCell.appendChild(buildBookingActionTrigger(b));
                 }
 
-                wrap.appendChild(node);
+                tbody.appendChild(tr);
             }
 
-            list.replaceChildren(wrap);
-            updateBookingsStat(bookings.filter(b => b.status === "upcoming" || b.status === "active").length);
+            list.innerHTML = '';
+            const table = document.createElement("table");
+            table.className = "w-full text-sm";
+            table.innerHTML = `
+                <thead class="bg-muted/40">
+                    <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                        <th class="px-4 py-2.5 font-medium">Time</th>
+                        <th class="px-4 py-2.5 font-medium">Seat</th>
+                        <th class="px-4 py-2.5 font-medium">User</th>
+                        <th class="px-4 py-2.5 font-medium">Status</th>
+                        <th class="px-4 py-2.5 font-medium text-right"></th>
+                    </tr>
+                </thead>`;
+            table.appendChild(tbody);
+            list.appendChild(table);
+
+            const emptyFilter = document.createElement("p");
+            emptyFilter.id = "bookings-empty-filter";
+            emptyFilter.className = "hidden px-4 py-10 text-center text-sm text-muted-foreground";
+            emptyFilter.textContent = "No bookings match this filter.";
+            list.appendChild(emptyFilter);
+
+            applyBookingFilter();
         }
 
-        function updateBookingsStat(n) {
-            const el = document.getElementById("bookings-on-date-count");
-            if (el) el.textContent = String(n);
+        // ── Filter chips ────────────────────────────────────────────────
+        let activeFilter = "all";
+        // 'issues' is an aggregate over rows that need admin attention.
+        const FILTER_MATCHERS = {
+            all:      () => true,
+            upcoming: (s) => s === "upcoming",
+            active:   (s) => s === "active",
+            issues:   (s) => s === "no_show",
+        };
+
+        function paintFilterChips() {
+            document.querySelectorAll(".booking-filter").forEach((btn) => {
+                const isActive = btn.dataset.filter === activeFilter;
+                btn.classList.toggle("bg-primary",                isActive);
+                btn.classList.toggle("text-primary-foreground",   isActive);
+                btn.classList.toggle("bg-secondary",              !isActive);
+                btn.classList.toggle("text-secondary-foreground", !isActive);
+                btn.classList.toggle("hover:bg-muted",            !isActive);
+            });
+        }
+
+        function applyBookingFilter() {
+            const match = FILTER_MATCHERS[activeFilter] || FILTER_MATCHERS.all;
+            let visible = 0;
+            document.querySelectorAll(".booking-row").forEach((row) => {
+                const show = match(row.dataset.status);
+                row.classList.toggle("hidden", !show);
+                if (show) visible++;
+            });
+            const empty = document.getElementById("bookings-empty-filter");
+            if (empty) empty.classList.toggle("hidden", visible > 0 || !document.querySelector(".booking-row"));
+        }
+
+        // ── ⋯ action popover (shared across rows) ────────────────────────
+        const bookingActionState = { btn: null };
+
+        function openBookingActions(triggerBtn) {
+            if (isPopoverOpen("booking-actions-popover") && bookingActionState.btn === triggerBtn) {
+                closePopover("booking-actions-popover");
+                bookingActionState.btn = null;
+                return;
+            }
+            bookingActionState.btn = triggerBtn;
+            openPopover("booking-actions-popover", triggerBtn);
+        }
+
+        document.getElementById("booking-actions-override").addEventListener("click", () => {
+            const t = bookingActionState.btn;
+            closePopover("booking-actions-popover");
+            if (t) openOverrideDialog(buildOverrideDelegate(t));
+        });
+
+        document.getElementById("booking-actions-cancel").addEventListener("click", () => {
+            const t = bookingActionState.btn;
+            closePopover("booking-actions-popover");
+            if (t) cancelBooking(buildCancelDelegate(t));
+        });
+
+        // The existing openOverrideDialog/cancelBooking read dataset fields by
+        // name. Adapt the row trigger's dataset to those expected names.
+        function buildOverrideDelegate(triggerBtn) {
+            return {
+                dataset: {
+                    overrideId:  triggerBtn.dataset.actionTrigger,
+                    seatLabel:   triggerBtn.dataset.seatLabel,
+                    userLabel:   triggerBtn.dataset.userLabel,
+                    bookingDate: triggerBtn.dataset.bookingDate,
+                    startTime:   triggerBtn.dataset.startTime,
+                    duration:    triggerBtn.dataset.duration,
+                },
+            };
+        }
+        function buildCancelDelegate(triggerBtn) {
+            // cancelBooking sets `cancelTarget.btn = btn` and reads
+            // btn.dataset.cancelId + later flips btn.disabled. We need a real
+            // element so disabling has an effect; pass the trigger itself with
+            // a cancelId set.
+            triggerBtn.dataset.cancelId = triggerBtn.dataset.actionTrigger;
+            return triggerBtn;
         }
 
         // Tracks the reservation currently queued for the cancel alert dialog.
@@ -672,22 +757,76 @@
             });
         });
 
-        // ── Update seat button + Blocked Seats stat after a status change ─
-        function onSeatStatusChanged(btn, newStatus) {
-            if (!btn) return;
-            const wasBlocked = btn.getAttribute("data-status") === "blocked";
-            btn.setAttribute("data-status", newStatus);
-            btn.classList.remove(...SEAT_AVAILABLE_CLASS, ...SEAT_BLOCKED_CLASS);
-            btn.classList.add(...(newStatus === "blocked" ? SEAT_BLOCKED_CLASS : SEAT_AVAILABLE_CLASS));
-
-            const countEl = document.getElementById("blocked-seats-count");
-            if (countEl) {
-                const n = parseInt(countEl.textContent.trim(), 10);
-                if (!Number.isNaN(n)) {
-                    const delta = newStatus === "blocked" ? 1 : (wasBlocked ? -1 : 0);
-                    countEl.textContent = String(Math.max(0, n + delta));
-                }
+        // ── Booking system toggle ────────────────────────────────────────
+        // The destructive direction (enabled → disabled) routes through an
+        // AlertDialog so admins can't accidentally lock users out. Re-enabling
+        // is reversible and goes through immediately.
+        function toggleBookingSystem() {
+            const btn = document.getElementById("booking-system-toggle");
+            const currentlyEnabled = btn.dataset.enabled === "true";
+            if (currentlyEnabled) {
+                openAlertDialog("disable-booking-alert");
+            } else {
+                performBookingSystemToggle(true);
             }
         }
+
+        async function performBookingSystemToggle(nextEnabled) {
+            closeAlertDialog("disable-booking-alert");
+
+            const btn = document.getElementById("booking-system-toggle");
+            btn.disabled = true;
+
+            const fd = new FormData();
+            fd.append("csrf_token", "{{ csrf_token() }}");
+            fd.append("enabled", nextEnabled ? "true" : "false");
+
+            try {
+                const res  = await fetch("/api/admin/booking-system/toggle", { method: "POST", body: fd });
+                const data = await res.json();
+                if (data.success) {
+                    if (typeof showToast === "function") showToast(data.message, "success");
+                    applyBookingSystemUI(data.enabled);
+                } else {
+                    if (typeof showToast === "function") showToast(data.error || "Toggle failed.", "error");
+                }
+            } catch {
+                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function applyBookingSystemUI(enabled) {
+            const btn   = document.getElementById("booking-system-toggle");
+            const thumb = document.getElementById("booking-system-thumb");
+            const state = document.getElementById("booking-system-state");
+
+            btn.dataset.enabled = enabled ? "true" : "false";
+            btn.setAttribute("aria-checked", enabled ? "true" : "false");
+
+            // Switch track color
+            btn.classList.toggle("bg-green-500", enabled);
+            btn.classList.toggle("bg-gray-300",  !enabled);
+
+            // Thumb position
+            thumb.classList.toggle("translate-x-5", enabled);
+            thumb.classList.toggle("translate-x-0", !enabled);
+
+            // State label
+            state.textContent = enabled ? "Enabled" : "Disabled";
+            state.classList.toggle("text-green-700", enabled);
+            state.classList.toggle("text-red-700",   !enabled);
+        }
+
+        // ── Filter chip wiring + initial paint ──────────────────────────
+        document.querySelectorAll(".booking-filter").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                activeFilter = btn.dataset.filter;
+                paintFilterChips();
+                applyBookingFilter();
+            });
+        });
+        applyBookingFilter();
     </script>
 {% endblock %}

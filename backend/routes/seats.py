@@ -11,6 +11,7 @@ from controllers.seats import (
     check_in_reservation,
     CHECK_IN_GRACE_MINUTES,
 )
+from controllers.system import is_booking_enabled
 
 seats_bp = Blueprint('seats', __name__)
 
@@ -52,7 +53,12 @@ def user_dashboard():
 def seat_map():
     update_expired_reservations()
     zones = get_zones_with_seats()
-    return render_template("dashboard/seat-map.html", zones=zones, today=date.today().isoformat())
+    return render_template(
+        "dashboard/seat-map.html",
+        zones=zones,
+        today=date.today().isoformat(),
+        booking_enabled=is_booking_enabled(),
+    )
 
 
 @seats_bp.route('/my-bookings')

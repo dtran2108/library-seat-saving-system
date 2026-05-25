@@ -13,9 +13,21 @@
 ] %}
 
 {% block content %}
-<div class="p-6 max-w-5xl mx-auto">
+<div class="p-6 max-w-6xl mx-auto">
 
     {{ PageHeader("Seat Map", "Pick a date and time — green seats are free for that window.", icon="map") }}
+
+    {% if not booking_enabled %}
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-4 mb-5 flex items-start gap-3">
+            {{ Icon('lock', class="w-5 h-5 text-red-700 shrink-0 mt-0.5") }}
+            <div>
+                <p class="font-semibold text-red-700">Bookings are temporarily disabled.</p>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                    You can still browse the seat map, but new reservations are blocked until the library staff re-enables the system.
+                </p>
+            </div>
+        </div>
+    {% endif %}
 
     {# ── Find-a-seat bar: drives the whole grid ──────────────────────────── #}
     <div class="bg-card border border-border rounded-2xl p-4 mb-5">
@@ -243,8 +255,10 @@
 
 <script>
     // ── State ────────────────────────────────────────────────────────────
+    const BOOKING_ENABLED = {{ 'true' if booking_enabled else 'false' }};
     const SEAT_CLS = {
         available: 'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-green-50 border-green-300 text-green-700 hover:scale-105 hover:shadow-sm cursor-pointer',
+        readonly:  'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-green-50 border-green-300 text-green-700 cursor-not-allowed opacity-75',
         reserved:  'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-red-50 border-red-300 text-red-600 cursor-not-allowed opacity-75',
         blocked:   'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60',
         loading:   'seat-btn w-14 h-14 rounded-xl border-2 text-xs font-semibold transition-all duration-150 bg-secondary border-border text-muted-foreground animate-pulse',
@@ -330,10 +344,16 @@
             }
 
             if (availableIds.has(seatId)) {
-                btn.className = SEAT_CLS.available;
-                btn.disabled = false;
-                const label = btn.dataset.seatLabel || ('Seat ' + seatId);
-                btn.onclick = () => openBookingModal(seatId, label);
+                if (BOOKING_ENABLED) {
+                    btn.className = SEAT_CLS.available;
+                    btn.disabled  = false;
+                    const label = btn.dataset.seatLabel || ('Seat ' + seatId);
+                    btn.onclick = () => openBookingModal(seatId, label);
+                } else {
+                    btn.className = SEAT_CLS.readonly;
+                    btn.disabled  = true;
+                    btn.onclick   = null;
+                }
             } else {
                 btn.className = SEAT_CLS.reserved;
                 btn.disabled = true;

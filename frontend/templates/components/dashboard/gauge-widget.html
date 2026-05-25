@@ -1,0 +1,79 @@
+{#
+    GaugeWidget — semi-circular SVG gauge for a 0..100 percentage.
+
+    Pure SVG with a CSS transition on stroke-dashoffset so re-renders animate.
+    The fill color shifts to destructive when the value crosses `warn_at`.
+
+    Usage:
+        {% from "components/dashboard/gauge-widget.html" import GaugeWidget %}
+        {{ GaugeWidget(id="occupancy-gauge",
+                       label="Occupancy",
+                       value=kpis.occupancy_pct,
+                       subtitle="of " ~ kpis.usable_total ~ " usable seats",
+                       warn_at=85) }}
+
+    Geometry:
+      - Arc spans 180° (semi-circle), radius 80, drawn from (20,100) to (180,100).
+      - Arc length ≈ π × 80 ≈ 251.33; stroke-dashoffset walks the fill back from
+        the end to expose the percentage.
+#}
+{% macro GaugeWidget(id, label, value, subtitle="", warn_at=85, class="") %}
+    {% set pct = (value | round | int) if value is not none else 0 %}
+    {% if pct < 0 %}{% set pct = 0 %}{% elif pct > 100 %}{% set pct = 100 %}{% endif %}
+    {% set arc_length = 251.33 %}
+    {% set dashoffset = (arc_length * (1 - pct / 100)) | round(2) %}
+    {% set is_warn = pct >= warn_at %}
+    <section class="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col items-center justify-between {{ class }}">
+        <p class="text-xs uppercase tracking-wide text-muted-foreground self-start">{{ label }}</p>
+
+        <div class="w-full max-w-[200px] mt-1">
+            <svg viewBox="0 0 200 120" class="w-full overflow-visible" aria-label="{{ label }} gauge">
+                <defs>
+                    <linearGradient id="{{ id }}-grad" x1="0" y1="0" x2="1" y2="0">
+                        {% if is_warn %}
+                            <stop offset="0"   stop-color="hsl(0 75% 55%)" />
+                            <stop offset="1"   stop-color="hsl(15 85% 60%)" />
+                        {% else %}
+                            <stop offset="0"   stop-color="hsl(25 60% 45%)" />
+                            <stop offset="0.7" stop-color="hsl(35 65% 55%)" />
+                            <stop offset="1"   stop-color="hsl(160 45% 50%)" />
+                        {% endif %}
+                    </linearGradient>
+                </defs>
+
+                {# Background track #}
+                <path
+                    d="M 20 100 A 80 80 0 0 1 180 100"
+                    fill="none"
+                    stroke="hsl(36 20% 90%)"
+                    stroke-width="14"
+                    stroke-linecap="round"
+                />
+
+                {# Fill arc — stroke-dashoffset reveals percentage #}
+                <path
+                    d="M 20 100 A 80 80 0 0 1 180 100"
+                    fill="none"
+                    stroke="url(#{{ id }}-grad)"
+                    stroke-width="14"
+                    stroke-linecap="round"
+                    stroke-dasharray="{{ arc_length }}"
+                    stroke-dashoffset="{{ dashoffset }}"
+                    style="transition: stroke-dashoffset 0.8s cubic-bezier(0.22, 1, 0.36, 1);"
+                />
+
+                {# Big number #}
+                <text x="100" y="86"
+                      text-anchor="middle"
+                      font-family="ui-sans-serif, Inter, sans-serif"
+                      font-size="34"
+                      font-weight="700"
+                      fill="hsl(25 20% 15%)">{{ pct }}%</text>
+            </svg>
+        </div>
+
+        {% if subtitle %}
+            <p class="text-xs text-muted-foreground mt-1 text-center">{{ subtitle }}</p>
+        {% endif %}
+    </section>
+{% endmacro %}
