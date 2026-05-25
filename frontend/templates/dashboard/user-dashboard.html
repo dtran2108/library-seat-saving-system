@@ -10,7 +10,7 @@
 {% block content %}
 
 
-    <div class="p-6 max-w-4xl mx-auto">
+    <div class="p-6 max-w-6xl mx-auto">
         {{ PageHeader("Welcome back, " ~ (current_user['uname'].split(' ')[0] if current_user else 'Student') ~ "!", "Manage your study room reservations.") }}
 
         <!-- Quick Actions -->
