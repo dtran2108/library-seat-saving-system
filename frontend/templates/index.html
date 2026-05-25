@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% from "components/ui/button.html" import Button %}
 {% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/alert-dialog.html" import AlertDialog %}
 {% block title %}Home{%endblock %}
 {% block content%}
 <div class="min-h-screen bg-background">
@@ -14,9 +15,11 @@
       >
       <div class="flex gap-2">
         {% if current_user %}
-          <a href="{{ url_for('admin.admin_dashboard') if current_user['role'] == 'admin' else url_for('seats.user_dashboard') }}">
-            {{ Button("Go to Dashboard") }}
-          </a>
+          <button
+            type="button"
+            onclick="openAlertDialog('logout-confirm')"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 h-9 px-4 py-2"
+          >Log out</button>
         {% else %}
           <a href="{{ url_for('auth.login') }}">
             {{ Button("Login", variant="ghost") }}
@@ -134,4 +137,13 @@
     © 2026 Group 6 - MIS205
   </footer>
 </div>
+
+{{ AlertDialog(
+    id="logout-confirm",
+    title="Log out?",
+    description="Are you sure you want to log out?",
+    confirm_label="Log out",
+    confirm_href=url_for('auth.logout'),
+    cancel_label="Cancel"
+) }}
 {% endblock %}
