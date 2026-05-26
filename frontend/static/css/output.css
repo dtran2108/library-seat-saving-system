@@ -32,7 +32,6 @@
     --container-xs: 20rem;
     --container-sm: 24rem;
     --container-xl: 36rem;
-    --container-3xl: 48rem;
     --container-4xl: 56rem;
     --container-5xl: 64rem;
     --text-xs: 0.75rem;
@@ -409,9 +408,6 @@
   .block {
     display: block;
   }
-  .contents {
-    display: contents;
-  }
   .flex {
     display: flex;
   }
@@ -429,9 +425,6 @@
   }
   .inline-flex {
     display: inline-flex;
-  }
-  .table {
-    display: table;
   }
   .h-2 {
     height: calc(var(--spacing) * 2);
@@ -514,6 +507,9 @@
   .w-56 {
     width: calc(var(--spacing) * 56);
   }
+  .w-88 {
+    width: calc(var(--spacing) * 88);
+  }
   .w-\[22rem\] {
     width: 22rem;
   }
@@ -522,9 +518,6 @@
   }
   .w-full {
     width: 100%;
-  }
-  .max-w-3xl {
-    max-width: var(--container-3xl);
   }
   .max-w-4xl {
     max-width: var(--container-4xl);

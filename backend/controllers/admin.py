@@ -14,3 +14,10 @@ def get_dashboard_data():
     total_seats   = stats['total']   or 0
     blocked_seats = stats['blocked'] or 0
     return zones, total_seats, blocked_seats
+
+
+
+
+
+
+
