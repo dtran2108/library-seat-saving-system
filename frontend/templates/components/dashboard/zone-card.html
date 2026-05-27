@@ -1,0 +1,94 @@
+{#
+    ZoneCard — at-a-glance card for one zone.
+
+    Shows what an admin actually needs to know:
+      - live availability (with a progress bar),
+      - the top-N most-booked named seats (so "A-04" beats an anonymous heatmap cell),
+      - a tier badge ("Quiet" / "Average" / "High demand") summarising 30-day demand.
+
+    Args:
+      zone – one entry from controllers.admin.get_zone_summaries:
+             {'name', 'location', 'total', 'blocked', 'available_now',
+              'tier', 'top_seats': [{'deskNo', 'uses'}, ...], 'total_bookings'}
+
+    Usage:
+        {% from "components/dashboard/zone-card.html" import ZoneCard %}
+        {% for z in zone_summaries %}
+            {{ ZoneCard(z) }}
+        {% endfor %}
+#}
+{% macro ZoneCard(zone) %}
+    {% if zone.tier == 'high' %}
+        {% set tier_label = 'High demand' %}
+        {% set tier_class = 'bg-red-100 text-red-700' %}
+    {% elif zone.tier == 'average' %}
+        {% set tier_label = 'Average' %}
+        {% set tier_class = 'bg-amber-100 text-amber-700' %}
+    {% else %}
+        {% set tier_label = 'Quiet' %}
+        {% set tier_class = 'bg-emerald-100 text-emerald-700' %}
+    {% endif %}
+
+    {# Denominator is the physical total — blocked seats are part of the zone,
+       just unavailable. Showing 48/49 reads naturally; 48/48 implied that the
+       blocked seat had vanished. #}
+    {% set free_pct = (100 * zone.available_now / zone.total) | round | int if zone.total > 0 else 0 %}
+
+    <article class="rounded-2xl border border-border bg-card shadow-sm p-4 flex flex-col gap-3">
+        <header class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <h3 class="font-semibold text-foreground text-sm truncate">{{ zone.name }}</h3>
+                <p class="text-xs text-muted-foreground mt-0.5">{{ zone.location }}</p>
+            </div>
+            <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full {{ tier_class }}">
+                {{ tier_label }}
+            </span>
+        </header>
+
+        {# Live availability — the most action-relevant number. #}
+        <div>
+            <div class="flex items-baseline justify-between mb-1">
+                <span class="text-xs text-muted-foreground">Available now</span>
+                <span class="text-sm font-semibold text-foreground font-mono tabular-nums">
+                    {{ zone.available_now }} <span class="text-muted-foreground font-normal">/ {{ zone.total }}</span>
+                </span>
+            </div>
+            <div class="h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-500" style="width: {{ free_pct }}%"></div>
+            </div>
+            {% if zone.blocked %}
+                <p class="text-[10px] text-amber-700 mt-1.5">
+                    {{ zone.blocked }} blocked for maintenance
+                </p>
+            {% endif %}
+        </div>
+
+        {# Top-3 most-booked named seats — concrete and actionable. #}
+        {% if zone.top_seats %}
+            <div>
+                <p class="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Most-booked · last 30 days
+                </p>
+                <ol class="space-y-1">
+                    {% for seat in zone.top_seats %}
+                        <li class="flex items-center justify-between text-xs">
+                            <span class="flex items-center gap-2 min-w-0">
+                                <span class="inline-flex w-4 h-4 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-muted-foreground shrink-0">
+                                    {{ loop.index }}
+                                </span>
+                                <span class="font-medium text-foreground font-mono">{{ seat.deskNo }}</span>
+                            </span>
+                            <span class="text-muted-foreground font-mono tabular-nums shrink-0">
+                                {{ seat.uses }} booking{{ '' if seat.uses == 1 else 's' }}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        {% else %}
+            <p class="text-xs text-muted-foreground">
+                No bookings in this zone yet over the last 30 days.
+            </p>
+        {% endif %}
+    </article>
+{% endmacro %}

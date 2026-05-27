@@ -1,0 +1,111 @@
+{% extends "layout.html" %}
+{% from "components/ui/button.html" import Button %}
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/input.html" import Input %}
+{% from "components/ui/badge.html" import Badge %}
+
+{% block title %}Admin Signup{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+  <div class="w-full max-w-sm">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-3">
+        {{ Icon('shield-check', class="w-6 h-6 text-primary") }}
+      </div>
+      <h1 class="font-playfair text-2xl font-bold text-foreground">Activate admin account</h1>
+      <p class="text-muted-foreground text-sm mt-1">
+        You've been invited to join as an administrator.
+      </p>
+    </div>
+
+    {% if not invite %}
+      {# ── Token error state — no form, just a card explaining the problem #}
+      <div class="bg-card border border-border rounded-2xl p-6 shadow-sm">
+        <div class="flex items-start gap-3">
+          <div class="shrink-0 w-9 h-9 rounded-full bg-destructive/10 flex items-center justify-center">
+            {{ Icon('alert-triangle', class="w-5 h-5 text-destructive") }}
+          </div>
+          <div class="flex-1">
+            <p class="font-semibold text-foreground">Invite unavailable</p>
+            <p class="text-sm text-muted-foreground mt-1">{{ message }}</p>
+          </div>
+        </div>
+        <a href="{{ url_for('auth.login') }}" class="block mt-5">
+          {{ Button("Back to login", class="w-full", variant="outline") }}
+        </a>
+      </div>
+    {% else %}
+      {# ── Valid invite — show form #}
+      <div class="bg-card border border-border rounded-2xl p-6 shadow-sm">
+
+        <!-- Read-only invite summary -->
+        <div class="rounded-xl border border-border bg-secondary/40 px-4 py-3 mb-5">
+          <p class="text-xs uppercase tracking-wide text-muted-foreground mb-2">Invited as</p>
+          <div class="flex items-center justify-between gap-2">
+            <p class="font-semibold text-foreground">{{ invite.uname }}</p>
+            {{ Badge('admin', variant='primary') }}
+          </div>
+          <p class="text-xs text-muted-foreground mt-1 font-mono">{{ invite.uId }}</p>
+          <p class="text-xs text-muted-foreground mt-2">
+            {{ Icon('clock', class="w-3 h-3 inline -mt-px") }}
+            Link expires {{ invite.expiresAt }}
+          </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('auth.admin_signup') }}" class="space-y-4" novalidate>
+          {{ form.hidden_tag() }}
+          <input type="hidden" name="token" value="{{ token }}" />
+
+          {% if message %}
+            <div class="flex items-start gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+              {{ Icon('alert-triangle', class="w-4 h-4 mt-0.5 shrink-0") }}
+              {{ message }}
+            </div>
+          {% endif %}
+
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-1">
+              {{ form.password.label(class="text-sm font-medium text-foreground") }}
+              <span class="text-destructive text-sm leading-none" aria-hidden="true">*</span>
+            </div>
+            {{ Input(form.password) }}
+            {% for error in form.password.errors %}
+              <p class="text-xs text-destructive">{{ error }}</p>
+            {% endfor %}
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-1">
+              {{ form.confirm_password.label(class="text-sm font-medium text-foreground") }}
+              <span class="text-destructive text-sm leading-none" aria-hidden="true">*</span>
+            </div>
+            {{ Input(form.confirm_password) }}
+            {% for error in form.confirm_password.errors %}
+              <p class="text-xs text-destructive">{{ error }}</p>
+            {% endfor %}
+          </div>
+
+          <p class="text-xs text-muted-foreground">
+            <span class="text-destructive">*</span> Required field
+          </p>
+
+          {{ Button(form.submit.label.text, class="w-full", type="submit") }}
+        </form>
+      </div>
+
+      <p class="text-center text-sm text-muted-foreground mt-4">
+        Already have an account?
+        <a href="{{ url_for('auth.login') }}" class="text-primary font-medium hover:underline">Login</a>
+      </p>
+    {% endif %}
+
+    <p class="text-center text-sm text-muted-foreground mt-2">
+      <a href="{{ url_for('index') }}" class="hover:underline">← Back to home</a>
+    </p>
+
+  </div>
+</div>
+{% endblock %}

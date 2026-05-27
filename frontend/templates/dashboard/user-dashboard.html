@@ -10,16 +10,7 @@
 {% block content %}
 
 
-    {%
-        set upcoming_bookings = [
-            {'id': 1, 'seat_number': 'A3', 'booking_date': 'Saturday, May 10', 'start_time': '09:00', 'end_time': '12:00', 'status': 'confirmed'},
-            {'id': 2, 'seat_number': 'B5', 'booking_date': 'Monday, May 12', 'start_time': '14:00', 'end_time': '17:00', 'status': 'confirmed'},
-            {'id': 3, 'seat_number': 'C1', 'booking_date': 'Wednesday, May 14', 'start_time': '08:00', 'end_time': '11:00', 'status': 'confirmed'}
-        ]
-    %}
-    {# ----------------------------------------------------------------- #}
-
-    <div class="p-6 max-w-4xl mx-auto">
+    <div class="p-6 max-w-6xl mx-auto">
         {{ PageHeader("Welcome back, " ~ (current_user['uname'].split(' ')[0] if current_user else 'Student') ~ "!", "Manage your study room reservations.") }}
 
         <!-- Quick Actions -->
@@ -61,14 +52,27 @@
             {% else %}
                 <div class="flex flex-col gap-3">
                     {% for b in upcoming_bookings %}
-                        <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between">
+                        <div class="bg-card border border-border rounded-2xl p-4 flex items-center justify-between gap-3">
                             <div>
-                                <p class="font-semibold text-foreground">Seat {{ b.seat_number }}</p>
+                                <p class="font-semibold text-foreground">{{ b.seat_label }}</p>
                                 <p class="text-sm text-muted-foreground">
                                     {{ b.booking_date }} · {{ b.start_time }} – {{ b.end_time }}
                                 </p>
+                                {% if b.can_check_in %}
+                                    <p class="text-xs text-amber-700 mt-1">
+                                        Check in by {{ b.check_in_deadline }} or your seat will be released.
+                                    </p>
+                                {% endif %}
                             </div>
-                            <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Confirmed</span>
+                            <div class="flex items-center gap-2 shrink-0">
+                                {% if b.checked_in %}
+                                    <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">Checked in</span>
+                                {% elif b.status == 'active' %}
+                                    <span class="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full capitalize">Active</span>
+                                {% else %}
+                                    <span class="px-3 py-1 bg-primary/15 text-primary text-xs font-medium rounded-full capitalize">Upcoming</span>
+                                {% endif %}
+                            </div>
                         </div>
                     {% endfor %}
 

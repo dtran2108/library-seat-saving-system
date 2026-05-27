@@ -70,9 +70,31 @@ class SignUpForm(FlaskForm):
         validators=[
             DataRequired(),
             # EqualTo compares this field's value to another field's value at
-            # submission time. We can't do this with a simple Length check.
+            # submission time.
             EqualTo('password', message='Passwords must match.'),
         ],
         render_kw={'required': True, 'placeholder': 'Repeat your password'},
     )
     submit = SubmitField('Create Account')
+
+
+class AdminSignUpForm(FlaskForm):
+    # Student ID and name come from the invite (read-only), so the form only
+    # asks the invitee to choose their password.
+    password = PasswordField(
+        'Password',
+        validators=[
+            DataRequired(),
+            Length(min=6, message='Password must be at least 6 characters.'),
+        ],
+        render_kw={'required': True, 'placeholder': 'At least 6 characters'},
+    )
+    confirm_password = PasswordField(
+        'Confirm Password',
+        validators=[
+            DataRequired(),
+            EqualTo('password', message='Passwords must match.'),
+        ],
+        render_kw={'required': True, 'placeholder': 'Repeat your password'},
+    )
+    submit = SubmitField('Activate Admin Account')

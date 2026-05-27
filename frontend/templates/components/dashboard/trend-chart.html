@@ -1,0 +1,106 @@
+{#
+    TrendChart — Chart.js area chart for a labeled time series.
+
+    Reads --color-primary from the document to stay in sync with the theme.
+    `series` is a list of {label, count} dicts (e.g. from get_hourly_bookings).
+
+    Usage:
+        {% from "components/dashboard/trend-chart.html" import TrendChart %}
+        {{ TrendChart(id="occupancy-trend",
+                      title="Occupancy trends",
+                      subtitle="Concurrent reservations · last 24h",
+                      series=hourly_bookings) }}
+#}
+{% macro TrendChart(id, title, series, subtitle="", height_class="h-56", class="") %}
+<section class="bg-card border border-border rounded-2xl p-5 shadow-sm h-full flex flex-col {{ class }}">
+    <div class="flex items-start justify-between mb-3 gap-3 flex-wrap">
+        <div>
+            <h2 class="font-semibold text-foreground">{{ title }}</h2>
+            {% if subtitle %}
+                <p class="text-xs text-muted-foreground mt-0.5">{{ subtitle }}</p>
+            {% endif %}
+        </div>
+        {% set total = series | sum(attribute='count') %}
+        <div class="text-right">
+            <p class="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
+            <p class="text-lg font-bold text-foreground font-mono tabular-nums">{{ total }}</p>
+        </div>
+    </div>
+    <div class="relative flex-1 {{ height_class }}">
+        <canvas id="{{ id }}"></canvas>
+    </div>
+</section>
+
+<script>
+    (function() {
+        const canvas = document.getElementById({{ id | tojson }});
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        const styles  = getComputedStyle(document.documentElement);
+        const primary = (styles.getPropertyValue('--color-primary').trim()) || 'hsl(25 60% 45%)';
+        const muted   = (styles.getPropertyValue('--color-muted-foreground').trim()) || 'hsl(25 10% 50%)';
+        const border  = (styles.getPropertyValue('--color-border').trim()) || 'hsl(36 20% 86%)';
+
+        // Build a vertical gradient fill from the primary color: 25% opacity at
+        // the top, 0% at the bottom — gives the area chart its soft glow.
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 220);
+        gradient.addColorStop(0,   primary.replace(/\)$/, ' / 0.28)'));
+        gradient.addColorStop(0.6, primary.replace(/\)$/, ' / 0.08)'));
+        gradient.addColorStop(1,   primary.replace(/\)$/, ' / 0)'));
+
+        const series = {{ series | tojson }};
+        const labels = series.map(p => p.label);
+        const data   = series.map(p => p.count);
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: {{ title | tojson }},
+                    data,
+                    borderColor: primary,
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: primary,
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend:  { display: false },
+                    tooltip: {
+                        displayColors: false,
+                        backgroundColor: 'hsl(25 20% 15%)',
+                        titleFont: { weight: '600' },
+                        padding: 10,
+                        cornerRadius: 8,
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: muted, font: { size: 11 }, maxRotation: 0, autoSkipPadding: 20 },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: border, drawTicks: false },
+                        border: { display: false },
+                        ticks: { color: muted, font: { size: 11 }, precision: 0, padding: 8 },
+                    },
+                },
+            },
+        });
+    })();
+</script>
+{% endmacro %}
