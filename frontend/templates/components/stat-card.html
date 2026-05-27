@@ -1,7 +1,7 @@
-{% macro StatCard(label, value, color="text-foreground") %}
+{% macro StatCard(label, value, color="text-foreground", value_id="") %}
     <div class="bg-card border border-border rounded-2xl p-4">
         <p class="text-xs text-muted-foreground mb-1">{{ label }}</p>
-        <p class="text-2xl font-bold {{ color }}">{{ value }}</p>
+        <p class="text-2xl font-bold {{ color }}"{% if value_id %} id="{{ value_id }}"{% endif %}>{{ value }}</p>
     </div>
 {% endmacro %}
 

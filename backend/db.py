@@ -45,6 +45,12 @@ def query_db(query, args=(), one=False):
 
 
 def init_db():
+    # Skip if the DB file already exists — schema.sql DROPs tables, so running
+    # it on every restart would wipe user data. To force a re-init, delete
+    # the DB file (or run `sqlite3 library.db < schema.sql` manually).
+    if os.path.exists(current_app.config['DATABASE']):
+        return
+
     db = get_db()
     # current_app.root_path is the directory where main.py lives (backend/),
     # so these paths are correct regardless of where you run flask from.
@@ -53,6 +59,7 @@ def init_db():
         path = os.path.join(current_app.root_path, filename)
         with open(path, encoding='utf-8') as f:
             db.executescript(f.read())
+    db.commit()
 
   
 def get_zones_with_seats():  

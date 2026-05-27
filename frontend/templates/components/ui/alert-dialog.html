@@ -21,6 +21,7 @@
     description="",
     confirm_label="Confirm",
     confirm_href="#",
+    confirm_onclick="",
     cancel_label="Cancel"
 ) %}
 
@@ -64,12 +65,23 @@
             >
                 {{ cancel_label }}
             </button>
+            {% if confirm_onclick %}
+            <button
+                type="button"
+                id="{{ id }}-confirm"
+                onclick="{{ confirm_onclick }}"
+                class="{{ btn_base }} {{ btn_destructive }}"
+            >
+                {{ confirm_label }}
+            </button>
+            {% else %}
             <a
                 href="{{ confirm_href }}"
                 class="{{ btn_base }} {{ btn_destructive }}"
             >
                 {{ confirm_label }}
             </a>
+            {% endif %}
         </div>
     </div>
 </div>

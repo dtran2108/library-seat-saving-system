@@ -7,6 +7,7 @@ from db import close_db, query_db, init_db
 from routes.auth import auth_bp
 from routes.seats import seats_bp
 from routes.admin import admin_bp
+from controllers.seats import get_zones_with_seats
 
 _FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
 
@@ -39,13 +40,10 @@ def inject_current_user():
 
 @app.route('/')
 def index():
-    features = [
-        {"icon": "map-pin",      "title": "Interactive Seat Map", "desc": "See the full floor plan with real-time availability at a glance."},
-        {"icon": "clock",        "title": "Easy Booking",         "desc": "Reserve a seat for up to 4 hours. No more saving with bags!"},
-        {"icon": "shield-check", "title": "Fair for Everyone",    "desc": "Confirmed reservations only — no phantom placeholders."},
-        {"icon": "book-open",    "title": "Manage Your Sessions", "desc": "View, modify or cancel your upcoming bookings anytime."}
-    ]
-    return render_template("index.html", features=features)
+    zones  = get_zones_with_seats()
+    zone_a = next((z for z in zones if z['name'] == 'Learning Plaza A'), None)
+    zone_b = next((z for z in zones if z['name'] == 'Learning Plaza B'), None)
+    return render_template("index.html", zone_a=zone_a, zone_b=zone_b)
 
 
 with app.app_context():

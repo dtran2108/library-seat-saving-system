@@ -1,0 +1,230 @@
+{% extends "dashboard-layout.html" %}
+
+{% from "components/ui/icon.html" import Icon %}
+{% from "components/ui/popover.html" import Popover %}
+{% from "components/ui/page-header.html" import PageHeader %}
+
+{% block title %}Manage Seats{% endblock %}
+
+{# One zone block — header + seat-button grid. #}
+{% macro ZoneSection(zone) %}
+    <div class="bg-card border border-border rounded-2xl p-5">
+        {% set blocked_count = zone.seats | selectattr('status', 'equalto', 'blocked') | list | length %}
+        <div class="flex items-start justify-between gap-3 mb-3 flex-wrap">
+            <div>
+                <p class="font-semibold text-foreground">{{ zone.name }}</p>
+                <p class="text-xs text-muted-foreground mt-0.5">{{ zone.location }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                {% if zone.zone_status == 'maintenance' %}
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                        Zone closed
+                    </span>
+                {% endif %}
+                <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground">
+                    {{ zone.total }} seats · {{ blocked_count }} blocked
+                </span>
+            </div>
+        </div>
+
+        {% if zone.name == 'Learning Plaza A' %}
+            <div class="mb-4">
+                <img
+                    src="{{ url_for('static', filename='plazaA.jpg') }}"
+                    alt="Learning Plaza A Floor Plan"
+                    class="w-full h-auto rounded-lg border border-border shadow-sm"
+                />
+            </div>
+        {% elif zone.name == 'Learning Plaza B' %}
+            <div class="mb-4">
+                <img
+                    src="{{ url_for('static', filename='plazaB.jpg') }}"
+                    alt="Learning Plaza B Floor Plan"
+                    class="w-full h-auto rounded-lg border border-border shadow-sm"
+                />
+            </div>
+        {% endif %}
+
+        <div class="flex flex-wrap gap-2">
+            {% for seat in zone.seats %}
+                {% set status_class = "bg-amber-50 border-amber-400 text-amber-700" if seat.status == 'blocked' else "bg-green-50 border-green-300 text-green-700" %}
+                <button
+                    type="button"
+                    class="seat-btn w-12 h-12 rounded-xl border-2 text-xs font-semibold transition-all duration-150 hover:scale-105 {{ status_class }}"
+                    data-id="{{ seat.seatId }}"
+                    data-number="{{ zone.name }} · {{ seat.deskNo }}"
+                    data-status="{{ seat.status }}"
+                    onclick="openSeatPopover(this)"
+                >
+                    {{ seat.deskNo }}
+                </button>
+            {% endfor %}
+        </div>
+    </div>
+{% endmacro %}
+
+{% block content %}
+
+    <div class="p-6 max-w-6xl mx-auto">
+        <div class="flex items-start justify-between gap-3 flex-wrap mb-6">
+            <div>
+                <h1 class="font-playfair text-2xl font-bold text-foreground flex items-center gap-2">
+                    {{ Icon('map', class="w-6 h-6 text-primary") }}
+                    Manage seats
+                </h1>
+                <p class="text-sm text-muted-foreground mt-1">
+                    Block individual seats for maintenance, or unblock them when they're back in service.
+                </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 mt-1">
+                <span class="text-xs text-muted-foreground">Blocked seats:</span>
+                <span id="blocked-seats-count" class="text-sm font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5">
+                    {{ blocked_seats }}
+                </span>
+            </div>
+        </div>
+
+        {# Legend #}
+        <div class="bg-card border border-border rounded-2xl p-4 mb-5 flex flex-wrap items-center gap-5">
+            <div class="flex items-center gap-2 text-xs font-medium text-foreground">
+                <span class="w-4 h-4 rounded bg-green-50 border-2 border-green-300 inline-block"></span>
+                Available
+            </div>
+            <div class="flex items-center gap-2 text-xs font-medium text-foreground">
+                <span class="w-4 h-4 rounded bg-amber-50 border-2 border-amber-400 inline-block"></span>
+                Blocked
+            </div>
+            <p class="text-xs text-muted-foreground sm:ml-auto">Click a seat to block or unblock it.</p>
+        </div>
+
+        {# Zones #}
+        {% if not zones %}
+            <div class="bg-card border border-border rounded-2xl p-10 text-center text-sm text-muted-foreground">
+                No zones configured yet.
+            </div>
+        {% else %}
+            <div class="flex flex-col gap-5">
+                {% for zone in zones %}
+                    {{ ZoneSection(zone) }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+
+    {# ── Seat action popover (block / unblock) ───────────────────────── #}
+    {% call Popover(id="seat-popover", width_class="w-56") %}
+        <div class="mb-3">
+            <p class="font-semibold text-foreground text-sm" id="seat-popover-name">Seat --</p>
+            <p class="text-xs text-muted-foreground capitalize" id="seat-popover-status">Status: --</p>
+        </div>
+        <form method="POST" id="seat-popover-form" onsubmit="return submitSeatAction(event)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="seat_id" id="seat-popover-seat-id" value="" />
+            <button
+                type="submit"
+                id="seat-popover-action"
+                data-action="block"
+                class="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-9 px-4 py-2 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
+            >
+                <span data-icon="block">{{ Icon('lock', class="w-4 h-4") }}</span>
+                <span data-icon="unblock" class="hidden">{{ Icon('unlock', class="w-4 h-4") }}</span>
+                <span id="seat-popover-action-label">Block Seat</span>
+            </button>
+        </form>
+    {% endcall %}
+
+    <script>
+        // ── Seat button palettes (restored after a status change) ────────
+        const SEAT_AVAILABLE_CLASS = "bg-green-50 border-green-300 text-green-700".split(" ");
+        const SEAT_BLOCKED_CLASS   = "bg-amber-50 border-amber-400 text-amber-700".split(" ");
+
+        // ── Popover action-button palettes ───────────────────────────────
+        const ACTION_BLOCK_CLASS   = "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90".split(" ");
+        const ACTION_UNBLOCK_CLASS = "border border-green-400 bg-transparent text-green-700 shadow-sm hover:bg-green-50".split(" ");
+
+        let activeSeatBtn = null;
+
+        function openSeatPopover(seatBtn) {
+            if (activeSeatBtn === seatBtn && isPopoverOpen("seat-popover")) {
+                closePopover("seat-popover");
+                activeSeatBtn = null;
+                return;
+            }
+            activeSeatBtn = seatBtn;
+
+            const isBlocked = seatBtn.getAttribute("data-status") === "blocked";
+
+            document.getElementById("seat-popover-name").textContent   = seatBtn.getAttribute("data-number");
+            document.getElementById("seat-popover-status").textContent = "Status: " + seatBtn.getAttribute("data-status");
+            document.getElementById("seat-popover-seat-id").value      = seatBtn.getAttribute("data-id");
+
+            setPopoverActionMode(isBlocked ? "unblock" : "block");
+            openPopover("seat-popover", seatBtn);
+        }
+
+        function setPopoverActionMode(mode) {
+            const actionBtn = document.getElementById("seat-popover-action");
+            const isUnblock = mode === "unblock";
+
+            actionBtn.disabled = false;
+            actionBtn.dataset.action = mode;
+
+            actionBtn.classList.remove(...ACTION_BLOCK_CLASS, ...ACTION_UNBLOCK_CLASS);
+            actionBtn.classList.add(...(isUnblock ? ACTION_UNBLOCK_CLASS : ACTION_BLOCK_CLASS));
+
+            document.querySelector('[data-icon="block"]').classList.toggle("hidden", isUnblock);
+            document.querySelector('[data-icon="unblock"]').classList.toggle("hidden", !isUnblock);
+            document.getElementById("seat-popover-action-label").textContent =
+                isUnblock ? "Unblock Seat" : "Block Seat";
+        }
+
+        async function submitSeatAction(event) {
+            event.preventDefault();
+            const form      = event.target;
+            const submitBtn = document.getElementById("seat-popover-action");
+            const isUnblock = submitBtn.dataset.action === "unblock";
+            const endpoint  = isUnblock ? "/api/admin/unblock-seat" : "/api/admin/block-seat";
+
+            submitBtn.disabled = true;
+
+            try {
+                const res  = await fetch(endpoint, { method: "POST", body: new FormData(form) });
+                const data = await res.json();
+
+                if (data.success) {
+                    onSeatStatusChanged(activeSeatBtn, isUnblock ? "available" : "blocked");
+                    closePopover("seat-popover");
+                    activeSeatBtn = null;
+                    if (typeof showToast === "function") showToast(data.message, "success");
+                } else {
+                    if (typeof showToast === "function") {
+                        showToast(data.error || "Action failed.", "error");
+                    }
+                    submitBtn.disabled = false;
+                }
+            } catch {
+                if (typeof showToast === "function") showToast("Network error. Please try again.", "error");
+                submitBtn.disabled = false;
+            }
+            return false;
+        }
+
+        function onSeatStatusChanged(btn, newStatus) {
+            if (!btn) return;
+            const wasBlocked = btn.getAttribute("data-status") === "blocked";
+            btn.setAttribute("data-status", newStatus);
+            btn.classList.remove(...SEAT_AVAILABLE_CLASS, ...SEAT_BLOCKED_CLASS);
+            btn.classList.add(...(newStatus === "blocked" ? SEAT_BLOCKED_CLASS : SEAT_AVAILABLE_CLASS));
+
+            const countEl = document.getElementById("blocked-seats-count");
+            if (countEl) {
+                const n = parseInt(countEl.textContent.trim(), 10);
+                if (!Number.isNaN(n)) {
+                    const delta = newStatus === "blocked" ? 1 : (wasBlocked ? -1 : 0);
+                    countEl.textContent = String(Math.max(0, n + delta));
+                }
+            }
+        }
+    </script>
+
+{% endblock %}
