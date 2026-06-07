@@ -61,3 +61,11 @@ def init_db():
             db.executescript(f.read())
     db.commit()
 
+  
+def get_zones_with_seats():  
+    zones = query_db("SELECT * FROM zones ORDER BY zoneId")  
+    result = []  
+    for zone in zones:  
+        seats = query_db("SELECT * FROM seats WHERE zoneId = ? ORDER BY destNo", (zone["zoneId"],))  
+        result.append({"zone": zone, "seats": seats})  
+    return result 

@@ -111,19 +111,16 @@
 
   <!-- Features -->
   <section class="max-w-5xl mx-auto px-4 py-8">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border">
       {% set features = [
-        {"icon": "map-pin",      "title": "Interactive Seat Map", "desc": "See the full floor plan with real-time availability at a glance."},
-        {"icon": "clock",        "title": "Easy Booking",         "desc": "Reserve a seat for up to 4 hours. No more saving with bags!"},
-        {"icon": "shield-check", "title": "Fair for Everyone",    "desc": "Confirmed reservations only — no phantom placeholders."},
-        {"icon": "book-open",    "title": "Manage Your Sessions", "desc": "View, modify or cancel your upcoming bookings anytime."}
+        {"title": "Interactive Seat Map", "desc": "See the full floor plan with real-time availability at a glance."},
+        {"title": "Easy Booking",         "desc": "Reserve a seat for up to 4 hours. No more saving with bags!"},
+        {"title": "Fair for Everyone",    "desc": "Confirmed reservations only — no phantom placeholders."},
+        {"title": "Manage Your Sessions", "desc": "View, modify or cancel your upcoming bookings anytime."}
       ] %}
       {% for feature in features %}
-      <div class="bg-card border border-border rounded-2xl p-5 hover:shadow-md transition-shadow">
-        <div class="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center mb-3">
-          {{ Icon(feature.icon, class="w-5 h-5 text-primary") }}
-        </div>
-        <h3 class="font-semibold text-foreground mb-1">{{ feature.title }}</h3>
+      <div class="flex flex-col items-center text-center px-6 py-6 gap-3">
+        <h3 class="font-semibold text-foreground text-lg">{{ feature.title }}</h3>
         <p class="text-sm text-muted-foreground">{{ feature.desc }}</p>
       </div>
       {% endfor %}
